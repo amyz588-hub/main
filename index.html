@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Morning Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --card: #1a2033;
+    --card-hover: #202844;
+    --accent: #ffb454;
+    --accent2: #7ee787;
+    --text: #eef1f8;
+    --muted: #8b93a7;
+    --border: #2a3350;
+    --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(circle at top left, #1b2340, #0f1420 60%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+  }
+  header .greeting { color: var(--muted); font-size: 15px; margin-top: 4px; }
+  #clock {
+    font-size: 40px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
+  }
+  #date { color: var(--muted); text-align: right; font-size: 14px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .card h2 {
+    margin: 0 0 14px 0;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .icon { font-size: 18px; }
+
+  /* Weather */
+  .weather-main { display: flex; align-items: center; gap: 16px; }
+  .weather-temp { font-size: 48px; font-weight: 700; }
+  .weather-icon { font-size: 48px; }
+  .weather-desc { color: var(--muted); font-size: 14px; }
+  .weather-forecast { display: flex; justify-content: space-between; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .weather-forecast div { text-align: center; font-size: 12px; color: var(--muted); }
+  .weather-forecast .fc-temp { color: var(--text); font-weight: 600; font-size: 14px; }
+
+  /* Habits */
+  .habit-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .habit-row:last-child { border-bottom: none; }
+  .habit-label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .habit-label .icon { font-size: 18px; }
+  .habit-progress-wrap { flex: 1; margin: 0 12px; height: 8px; background: #10162a; border-radius: 4px; overflow: hidden; }
+  .habit-progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent2), #4dd0e1); border-radius: 4px; transition: width .3s; }
+  .habit-value { font-size: 13px; color: var(--muted); min-width: 70px; text-align: right; }
+  .habit-controls { display: flex; gap: 4px; }
+  .habit-controls button {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+    background: #10162a; color: var(--text); cursor: pointer; font-size: 14px; line-height: 1;
+  }
+  .habit-controls button:hover { background: var(--card-hover); }
+  .habit-workout-toggle {
+    padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+    background: #10162a; color: var(--muted); cursor: pointer; font-size: 13px;
+  }
+  .habit-workout-toggle.done { background: var(--accent2); color: #0f1420; border-color: var(--accent2); font-weight: 600; }
+
+  /* Agenda */
+  .agenda-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .agenda-item:last-child { border-bottom: none; }
+  .agenda-time { color: var(--accent); font-size: 13px; font-weight: 600; min-width: 60px; }
+  .agenda-title { font-size: 14px; }
+  .agenda-loc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  /* Tasks */
+  .task-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .task-item:last-child { border-bottom: none; }
+  .task-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent2); cursor: pointer; }
+  .task-item.checked span { text-decoration: line-through; color: var(--muted); }
+  .task-add { display: flex; gap: 8px; margin-top: 12px; }
+  .task-add input {
+    flex: 1; background: #10162a; border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; color: var(--text); font-size: 13px;
+  }
+  .task-add button {
+    background: var(--accent2); border: none; border-radius: 8px; padding: 8px 14px;
+    color: #0f1420; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+
+  /* News */
+  .news-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .news-item:last-child { border-bottom: none; }
+  .news-title { font-size: 14px; }
+  .news-meta { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+  .mock-badge {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); border: 1px solid var(--border); border-radius: 20px;
+    padding: 2px 8px; margin-left: auto;
+  }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 id="greeting">Good morning</h1>
+    <div class="greeting" id="subgreeting">Here's your day at a glance.</div>
+  </div>
+  <div>
+    <div id="clock">--:--:--</div>
+    <div id="date">--</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Weather -->
+  <div class="card">
+    <h2><span class="icon">⛅</span> Weather <span class="mock-badge">mock data</span></h2>
+    <div class="weather-main">
+      <div class="weather-icon">🌤️</div>
+      <div>
+        <div class="weather-temp">68°F</div>
+        <div class="weather-desc">Partly cloudy · Feels like 66°F</div>
+      </div>
+    </div>
+    <div class="weather-forecast">
+      <div><div>9am</div><div class="fc-temp">65°</div></div>
+      <div><div>12pm</div><div class="fc-temp">72°</div></div>
+      <div><div>3pm</div><div class="fc-temp">75°</div></div>
+      <div><div>6pm</div><div class="fc-temp">70°</div></div>
+      <div><div>9pm</div><div class="fc-temp">63°</div></div>
+    </div>
+  </div>
+
+  <!-- Habit Tracker -->
+  <div class="card">
+    <h2><span class="icon">✅</span> Habit Tracker</h2>
+    <div class="habit-row">
+      <div class="habit-label"><span class="icon">🏋️</span> Workout</div>
+      <button class="habit-workout-toggle" id="workout-toggle">Mark done</button>
+    </div>
+    <div class="habit-row">
+      <div class="habit-label"><span class="icon">👟</span> Steps</div>
+      <div class="habit-progress-wrap"><div class="habit-progress-bar" id="steps-bar"></div></div>
+      <div class="habit-value" id="steps-value">0 / 10,000</div>
+      <div class="habit-controls">
+        <button data-habit="steps" data-delta="-500">-</button>
+        <button data-habit="steps" data-delta="500">+</button>
+      </div>
+    </div>
+    <div class="habit-row">
+      <div class="habit-label"><span class="icon">🥩</span> Protein</div>
+      <div class="habit-progress-wrap"><div class="habit-progress-bar" id="protein-bar"></div></div>
+      <div class="habit-value" id="protein-value">0 / 150g</div>
+      <div class="habit-controls">
+        <button data-habit="protein" data-delta="-10">-</button>
+        <button data-habit="protein" data-delta="10">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agenda -->
+  <div class="card">
+    <h2><span class="icon">📅</span> Today's Agenda <span class="mock-badge">mock data</span></h2>
+    <div class="agenda-item">
+      <div class="agenda-time">9:00</div>
+      <div>
+        <div class="agenda-title">Team standup</div>
+        <div class="agenda-loc">Zoom</div>
+      </div>
+    </div>
+    <div class="agenda-item">
+      <div class="agenda-time">11:30</div>
+      <div>
+        <div class="agenda-title">1:1 with manager</div>
+        <div class="agenda-loc">Conference Room B</div>
+      </div>
+    </div>
+    <div class="agenda-item">
+      <div class="agenda-time">1:00</div>
+      <div>
+        <div class="agenda-title">Lunch with Sam</div>
+        <div class="agenda-loc">Downtown Cafe</div>
+      </div>
+    </div>
+    <div class="agenda-item">
+      <div class="agenda-time">4:00</div>
+      <div>
+        <div class="agenda-title">Project review</div>
+        <div class="agenda-loc">Zoom</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tasks -->
+  <div class="card">
+    <h2><span class="icon">📝</span> Tasks</h2>
+    <div id="task-list"></div>
+    <div class="task-add">
+      <input type="text" id="task-input" placeholder="Add a task...">
+      <button id="task-add-btn">Add</button>
+    </div>
+  </div>
+
+  <!-- News -->
+  <div class="card">
+    <h2><span class="icon">📰</span> Headlines <span class="mock-badge">mock data</span></h2>
+    <div class="news-item">
+      <div class="news-title">Markets open higher as tech stocks rally</div>
+      <div class="news-meta">Business · 6 min read</div>
+    </div>
+    <div class="news-item">
+      <div class="news-title">Local city council approves new park funding</div>
+      <div class="news-meta">Local · 3 min read</div>
+    </div>
+    <div class="news-item">
+      <div class="news-title">New study highlights benefits of morning routines</div>
+      <div class="news-meta">Health · 4 min read</div>
+    </div>
+    <div class="news-item">
+      <div class="news-title">Weather service predicts mild week ahead</div>
+      <div class="news-meta">Weather · 2 min read</div>
+    </div>
+  </div>
+
+</div>
+
+<footer>Weather, agenda, and headlines are mock data — wire up real APIs when ready. Habits and tasks are saved locally in your browser and reset each day.</footer>
+
+<script>
+  // ---- Live clock ----
+  function pad(n) { return n.toString().padStart(2, '0'); }
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    document.getElementById('date').textContent =
+      now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const hour = now.getHours();
+    const greeting = document.getElementById('greeting');
+    if (hour < 12) greeting.textContent = 'Good morning';
+    else if (hour < 18) greeting.textContent = 'Good afternoon';
+    else greeting.textContent = 'Good evening';
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // ---- Storage helpers (reset daily) ----
+  const today = new Date().toISOString().slice(0, 10);
+  function loadState() {
+    const raw = localStorage.getItem('morning-dashboard');
+    if (!raw) return { date: today, steps: 0, protein: 0, workoutDone: false, tasks: [] };
+    const parsed = JSON.parse(raw);
+    if (parsed.date !== today) return { date: today, steps: 0, protein: 0, workoutDone: false, tasks: [] };
+    return parsed;
+  }
+  let state = loadState();
+  function saveState() {
+    localStorage.setItem('morning-dashboard', JSON.stringify(state));
+  }
+
+  // ---- Habit tracker ----
+  const STEPS_GOAL = 10000;
+  const PROTEIN_GOAL = 150;
+
+  function renderHabits() {
+    const stepsPct = Math.min(100, (state.steps / STEPS_GOAL) * 100);
+    document.getElementById('steps-bar').style.width = stepsPct + '%';
+    document.getElementById('steps-value').textContent = `${state.steps.toLocaleString()} / ${STEPS_GOAL.toLocaleString()}`;
+
+    const proteinPct = Math.min(100, (state.protein / PROTEIN_GOAL) * 100);
+    document.getElementById('protein-bar').style.width = proteinPct + '%';
+    document.getElementById('protein-value').textContent = `${state.protein}g / ${PROTEIN_GOAL}g`;
+
+    const workoutBtn = document.getElementById('workout-toggle');
+    if (state.workoutDone) {
+      workoutBtn.textContent = 'Done ✓';
+      workoutBtn.classList.add('done');
+    } else {
+      workoutBtn.textContent = 'Mark done';
+      workoutBtn.classList.remove('done');
+    }
+  }
+
+  document.querySelectorAll('.habit-controls button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const habit = btn.dataset.habit;
+      const delta = parseInt(btn.dataset.delta, 10);
+      state[habit] = Math.max(0, (state[habit] || 0) + delta);
+      saveState();
+      renderHabits();
+    });
+  });
+
+  document.getElementById('workout-toggle').addEventListener('click', () => {
+    state.workoutDone = !state.workoutDone;
+    saveState();
+    renderHabits();
+  });
+
+  // ---- Tasks ----
+  function renderTasks() {
+    const list = document.getElementById('task-list');
+    list.innerHTML = '';
+    if (state.tasks.length === 0) {
+      list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No tasks yet. Add one below.</div>';
+      return;
+    }
+    state.tasks.forEach((task, i) => {
+      const row = document.createElement('div');
+      row.className = 'task-item' + (task.done ? ' checked' : '');
+      row.innerHTML = `
+        <input type="checkbox" ${task.done ? 'checked' : ''} data-index="${i}">
+        <span>${escapeHtml(task.text)}</span>
+      `;
+      row.querySelector('input').addEventListener('change', e => {
+        state.tasks[i].done = e.target.checked;
+        saveState();
+        renderTasks();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function addTask() {
+    const input = document.getElementById('task-input');
+    const text = input.value.trim();
+    if (!text) return;
+    state.tasks.push({ text, done: false });
+    input.value = '';
+    saveState();
+    renderTasks();
+  }
+  document.getElementById('task-add-btn').addEventListener('click', addTask);
+  document.getElementById('task-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTask();
+  });
+
+  renderHabits();
+  renderTasks();
+</script>
+
+</body>
+</html>
