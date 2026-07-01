@@ -175,6 +175,17 @@
   .email-subject a:hover { text-decoration: underline; color: var(--accent); }
   .email-snippet { color: var(--muted); font-size: 12px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  /* Purchases / Returns */
+  .purchase-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .purchase-item:last-child { border-bottom: none; }
+  .purchase-merchant { font-size: 13px; font-weight: 600; }
+  .purchase-subject { font-size: 14px; margin-top: 2px; }
+  .purchase-subject a { color: var(--text); text-decoration: none; }
+  .purchase-subject a:hover { text-decoration: underline; color: var(--accent); }
+  .purchase-deadline { font-size: 12px; margin-top: 3px; color: var(--muted); }
+  .purchase-item.urgent .purchase-deadline { color: var(--danger); font-weight: 600; }
+  .purchase-item.soon .purchase-deadline { color: var(--accent); font-weight: 600; }
+
   .source-badge {
     font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--muted); border: 1px solid var(--border); border-radius: 20px;
@@ -263,6 +274,14 @@
     <h2><span class="icon">📧</span> Priority Inbox <span class="source-badge" id="gmail-status">Not connected</span></h2>
     <div id="gmail-list">
       <div style="color: var(--muted); font-size: 13px;">Important, unread email previews show up here once you sign in with Google (Agenda card) — Gmail uses the same sign-in.</div>
+    </div>
+  </div>
+
+  <!-- Purchases / Returns -->
+  <div class="card">
+    <h2><span class="icon">📦</span> Return Window Tracker <span class="source-badge" id="purchases-status">Not connected</span></h2>
+    <div id="purchases-list">
+      <div style="color: var(--muted); font-size: 13px;">Recent purchases (from Gmail's "Purchases" category) show up here once you sign in with Google, flagged as their 30-day return window gets close.</div>
     </div>
   </div>
 
@@ -895,6 +914,11 @@
     return items;
   }
 
+  function parseFromName(fromHeader) {
+    const name = (fromHeader || '').replace(/<.*>/, '').trim().replace(/^"|"$/g, '');
+    return name || fromHeader || 'Unknown sender';
+  }
+
   // ---- Inbox (live, Gmail via the same Google sign-in, priority = important + unread) ----
   async function fetchGmailInbox() {
     const list = document.getElementById('gmail-list');
@@ -933,9 +957,8 @@
         if (result.status !== 'fulfilled') return;
         const msg = result.value;
         const headers = (msg.payload && msg.payload.headers) || [];
-        const from = (headers.find(h => h.name === 'From') || {}).value || 'Unknown sender';
         const subject = (headers.find(h => h.name === 'Subject') || {}).value || '(no subject)';
-        const fromName = from.replace(/<.*>/, '').trim().replace(/^"|"$/g, '') || from;
+        const fromName = parseFromName((headers.find(h => h.name === 'From') || {}).value);
         const div = document.createElement('div');
         div.className = 'email-item';
         div.innerHTML = `
@@ -949,6 +972,86 @@
       document.getElementById('gmail-status').textContent = `Connected · ${messageRefs.length} priority`;
     } catch (err) {
       list.innerHTML = `<div style="color: var(--danger); font-size: 13px;">Could not load inbox: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ---- Purchases / Return Window Tracker (live, Gmail's built-in "Purchases" category) ----
+  // Best-effort: relies on Gmail's own purchase classification and assumes a flat 30-day
+  // return window, since actual retailer policies vary and aren't available from the email itself.
+  const RETURN_WINDOW_DAYS = 30;
+
+  async function fetchPurchases() {
+    const list = document.getElementById('purchases-list');
+    list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Loading purchases...</div>';
+    const authHeaders = { headers: { Authorization: `Bearer ${calendarAccessToken}` } };
+    try {
+      const listRes = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' +
+        encodeURIComponent('label:CATEGORY_PURCHASES newer_than:40d') + '&maxResults=10',
+        authHeaders
+      );
+      if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
+      const messageRefs = (await listRes.json()).messages || [];
+
+      if (messageRefs.length === 0) {
+        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No recent purchase emails found in the last 40 days.</div>';
+        document.getElementById('purchases-status').textContent = 'Connected';
+        return;
+      }
+
+      const results = await Promise.allSettled(messageRefs.map(ref =>
+        fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${ref.id}?format=metadata` +
+          '&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date',
+          authHeaders
+        ).then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+      ));
+
+      if (!results.some(r => r.status === 'fulfilled')) {
+        throw new Error('Could not load any purchase emails.');
+      }
+
+      const now = new Date();
+      const items = [];
+      results.forEach(result => {
+        if (result.status !== 'fulfilled') return;
+        const msg = result.value;
+        const headers = (msg.payload && msg.payload.headers) || [];
+        const fromRaw = (headers.find(h => h.name === 'From') || {}).value;
+        const subject = (headers.find(h => h.name === 'Subject') || {}).value || '(no subject)';
+        const dateRaw = (headers.find(h => h.name === 'Date') || {}).value;
+        const purchaseDate = dateRaw ? new Date(dateRaw) : new Date(Number(msg.internalDate));
+        const deadline = new Date(purchaseDate);
+        deadline.setDate(deadline.getDate() + RETURN_WINDOW_DAYS);
+        const daysLeft = Math.ceil((deadline - now) / 86400000);
+        items.push({ id: msg.id, merchant: parseFromName(fromRaw), subject, deadline, daysLeft });
+      });
+
+      items.sort((a, b) => a.daysLeft - b.daysLeft);
+
+      list.innerHTML = '';
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'purchase-item' + (item.daysLeft <= 5 ? ' urgent' : item.daysLeft <= 10 ? ' soon' : '');
+        const deadlineLabel = item.daysLeft < 0
+          ? `Return window closed ${Math.abs(item.daysLeft)}d ago`
+          : item.daysLeft === 0
+            ? 'Return window closes today'
+            : `${item.daysLeft}d left to return · by ${item.deadline.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+        div.innerHTML = `
+          <div class="purchase-merchant">${escapeHtml(item.merchant)}</div>
+          <div class="purchase-subject"><a href="https://mail.google.com/mail/u/0/#inbox/${item.id}" target="_blank" rel="noopener">${escapeHtml(item.subject)}</a></div>
+          <div class="purchase-deadline">${deadlineLabel}</div>
+        `;
+        list.appendChild(div);
+      });
+
+      document.getElementById('purchases-status').textContent = `Connected · ${items.length} tracked`;
+    } catch (err) {
+      list.innerHTML = `<div style="color: var(--danger); font-size: 13px;">Could not load purchases: ${escapeHtml(err.message)}</div>`;
     }
   }
 
@@ -979,6 +1082,7 @@
           calendarAccessToken = resp.access_token;
           await fetchCalendarEvents();
           await fetchGmailInbox();
+          await fetchPurchases();
         },
       });
       tokenClient.requestAccessToken();
@@ -1026,6 +1130,7 @@
           calendarAccessToken = resp.access_token;
           await fetchCalendarEvents();
           await fetchGmailInbox();
+          await fetchPurchases();
         },
       });
       tokenClient.requestAccessToken({ prompt: '' });
