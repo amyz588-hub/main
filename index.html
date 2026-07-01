@@ -172,6 +172,15 @@
   .news-title a:hover { text-decoration: underline; color: var(--accent); }
   .news-meta { color: var(--muted); font-size: 12px; margin-top: 3px; }
 
+  /* Inbox */
+  .email-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .email-item:last-child { border-bottom: none; }
+  .email-from { font-size: 13px; font-weight: 600; }
+  .email-subject { font-size: 14px; margin-top: 2px; }
+  .email-subject a { color: var(--text); text-decoration: none; }
+  .email-subject a:hover { text-decoration: underline; color: var(--accent); }
+  .email-snippet { color: var(--muted); font-size: 12px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .source-badge {
     font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--muted); border: 1px solid var(--border); border-radius: 20px;
@@ -241,7 +250,7 @@
     <div id="calendar-settings" class="calendar-settings-panel" style="display:none;">
       <p>
         1. In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>, create an OAuth 2.0 Client ID (type: Web application).<br>
-        2. Enable both the <strong>Google Calendar API</strong> and the <strong>Google Tasks API</strong> for that project (Tasks covers reminders, since Google migrated Reminders into Tasks).<br>
+        2. Enable the <strong>Google Calendar API</strong>, <strong>Google Tasks API</strong> (covers reminders, since Google migrated Reminders into Tasks), and <strong>Gmail API</strong> (for the Inbox card) for that project.<br>
         3. Add this page's exact URL (e.g. http://localhost:8000) to "Authorized JavaScript origins" — <code>file://</code> won't work, serve this page over http(s).<br>
         4. Paste the Client ID below. Optionally list specific calendar names to include (comma-separated) — this pulls those calendars even if they're hidden/unselected in your Google Calendar sidebar. Leave blank to include all your visible calendars.<br>
         5. Click Save, then "Sign in with Google".
@@ -255,6 +264,14 @@
       </div>
       <button class="habit-workout-toggle" id="calendar-list-btn" style="margin-top: 10px;">List my calendars</button>
       <div id="calendar-list-output" style="font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.6;"></div>
+    </div>
+  </div>
+
+  <!-- Inbox -->
+  <div class="card">
+    <h2><span class="icon">📧</span> Inbox <span class="source-badge" id="gmail-status">Not connected</span></h2>
+    <div id="gmail-list">
+      <div style="color: var(--muted); font-size: 13px;">Unread email previews show up here once you sign in with Google (Agenda card) — Gmail uses the same sign-in.</div>
     </div>
   </div>
 
@@ -868,6 +885,63 @@
     return items;
   }
 
+  // ---- Inbox (live, Gmail via the same Google sign-in, unread previews only) ----
+  async function fetchGmailInbox() {
+    const list = document.getElementById('gmail-list');
+    list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Loading inbox...</div>';
+    const authHeaders = { headers: { Authorization: `Bearer ${calendarAccessToken}` } };
+    try {
+      const listRes = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+        authHeaders
+      );
+      if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
+      const messageRefs = (await listRes.json()).messages || [];
+
+      if (messageRefs.length === 0) {
+        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Inbox zero — no unread email. 🎉</div>';
+        document.getElementById('gmail-status').textContent = 'Connected';
+        return;
+      }
+
+      const results = await Promise.allSettled(messageRefs.map(ref =>
+        fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${ref.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
+          authHeaders
+        ).then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+      ));
+
+      if (!results.some(r => r.status === 'fulfilled')) {
+        throw new Error('Could not load any messages.');
+      }
+
+      list.innerHTML = '';
+      results.forEach(result => {
+        if (result.status !== 'fulfilled') return;
+        const msg = result.value;
+        const headers = (msg.payload && msg.payload.headers) || [];
+        const from = (headers.find(h => h.name === 'From') || {}).value || 'Unknown sender';
+        const subject = (headers.find(h => h.name === 'Subject') || {}).value || '(no subject)';
+        const fromName = from.replace(/<.*>/, '').trim().replace(/^"|"$/g, '') || from;
+        const div = document.createElement('div');
+        div.className = 'email-item';
+        div.innerHTML = `
+          <div class="email-from">${escapeHtml(fromName)}</div>
+          <div class="email-subject"><a href="https://mail.google.com/mail/u/0/#inbox/${msg.id}" target="_blank" rel="noopener">${escapeHtml(subject)}</a></div>
+          <div class="email-snippet">${escapeHtml(msg.snippet || '')}</div>
+        `;
+        list.appendChild(div);
+      });
+
+      document.getElementById('gmail-status').textContent = `Connected · ${messageRefs.length} unread`;
+    } catch (err) {
+      list.innerHTML = `<div style="color: var(--danger); font-size: 13px;">Could not load inbox: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
   function updateCalendarConnectButton() {
     document.getElementById('calendar-connect-btn').textContent =
       persistent.calendarClientId ? 'Sign in with Google' : 'Connect Calendar';
@@ -886,7 +960,7 @@
       await loadGis();
       const tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: persistent.calendarClientId,
-        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly',
+        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly https://www.googleapis.com/auth/gmail.readonly',
         callback: async (resp) => {
           if (resp.error) {
             setAgendaError('Sign-in failed: ' + resp.error);
@@ -894,6 +968,7 @@
           }
           calendarAccessToken = resp.access_token;
           await fetchCalendarEvents();
+          await fetchGmailInbox();
         },
       });
       tokenClient.requestAccessToken();
