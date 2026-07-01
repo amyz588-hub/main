@@ -1001,6 +1001,29 @@
     }
   });
 
+  // Try to reuse the existing Google session on load, without requiring a click.
+  // Browsers often block popups that aren't triggered by a direct user gesture, so this
+  // fails silently and leaves the normal "Sign in with Google" button as a fallback.
+  async function attemptSilentSignIn() {
+    if (!persistent.calendarClientId) return;
+    try {
+      await loadGis();
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: persistent.calendarClientId,
+        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly https://www.googleapis.com/auth/gmail.readonly',
+        callback: async (resp) => {
+          if (resp.error) return;
+          calendarAccessToken = resp.access_token;
+          await fetchCalendarEvents();
+          await fetchGmailInbox();
+        },
+      });
+      tokenClient.requestAccessToken({ prompt: '' });
+    } catch (err) {
+      // Silent attempt failed — manual sign-in still works as before.
+    }
+  }
+
   document.getElementById('calendar-connect-btn').addEventListener('click', connectCalendar);
   document.getElementById('calendar-settings-btn').addEventListener('click', () => {
     const panel = document.getElementById('calendar-settings');
@@ -1029,6 +1052,7 @@
   renderSampleAgenda();
   fetchWeather();
   fetchNews();
+  attemptSilentSignIn();
 </script>
 
 </body>
