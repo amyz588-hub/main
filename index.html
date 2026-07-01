@@ -80,9 +80,11 @@
   .weather-temp { font-size: 48px; font-weight: 700; }
   .weather-icon { font-size: 48px; }
   .weather-desc { color: var(--muted); font-size: 14px; }
-  .weather-forecast { display: flex; justify-content: space-between; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .weather-forecast { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
   .weather-forecast div { text-align: center; font-size: 12px; color: var(--muted); }
-  .weather-forecast .fc-temp { color: var(--text); font-weight: 600; font-size: 14px; }
+  .weather-forecast .fc-icon { font-size: 16px; margin: 2px 0; }
+  .weather-forecast .fc-temp { color: var(--text); font-weight: 600; font-size: 13px; }
+  .weather-forecast .fc-lo { color: var(--muted); font-size: 11px; }
 
   /* Habits */
   .habit-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -104,12 +106,28 @@
   }
   .habit-workout-toggle.done { background: var(--accent2); color: #0f1420; border-color: var(--accent2); font-weight: 600; }
 
+  .week-grid { margin-bottom: 16px; }
+  .week-grid-row { display: grid; grid-template-columns: 22px repeat(7, 1fr); align-items: center; gap: 4px; padding: 3px 0; }
+  .week-grid-row div { text-align: center; font-size: 11px; color: var(--muted); }
+  .week-grid-today { color: var(--accent) !important; font-weight: 700; }
+  .week-grid-icon { font-size: 13px; }
+  .week-day-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #10162a; border: 1px solid var(--border); }
+  .week-day-dot.full { background: var(--accent2); border-color: var(--accent2); }
+  .week-day-dot.partial { background: rgba(255, 180, 84, 0.5); border-color: var(--accent); }
+
   /* Agenda */
   .agenda-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .agenda-item:last-child { border-bottom: none; }
   .agenda-time { color: var(--accent); font-size: 13px; font-weight: 600; min-width: 60px; }
   .agenda-title { font-size: 14px; }
   .agenda-loc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .agenda-day-group { margin-bottom: 10px; }
+  .agenda-day-group:last-child { margin-bottom: 0; }
+  .agenda-day-header {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent);
+    padding-bottom: 4px; border-bottom: 1px solid var(--border); margin-bottom: 2px;
+  }
+  .agenda-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
   .calendar-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   .calendar-settings-panel { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
   .calendar-settings-panel p { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 0 0 10px 0; }
@@ -170,7 +188,7 @@
 
   <!-- Weather -->
   <div class="card">
-    <h2><span class="icon">⛅</span> Weather <span class="source-badge"><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo · NYC</a></span></h2>
+    <h2><span class="icon">⛅</span> Weather · 7 Day <span class="source-badge"><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo · NYC</a></span></h2>
     <div class="weather-main">
       <div class="weather-icon" id="weather-icon">🌤️</div>
       <div>
@@ -183,7 +201,8 @@
 
   <!-- Habit Tracker -->
   <div class="card">
-    <h2><span class="icon">✅</span> Habit Tracker</h2>
+    <h2><span class="icon">✅</span> Habit Tracker · 7 Day</h2>
+    <div class="week-grid" id="habit-week-grid"></div>
     <div class="habit-row">
       <div class="habit-label"><span class="icon">🏋️</span> Workout</div>
       <button class="habit-workout-toggle" id="workout-toggle">Mark done</button>
@@ -210,16 +229,8 @@
 
   <!-- Agenda -->
   <div class="card">
-    <h2><span class="icon">📅</span> Today's Agenda <span class="source-badge" id="calendar-status">Not connected</span></h2>
-    <div id="agenda-list">
-      <div class="agenda-item">
-        <div class="agenda-time">9:00</div>
-        <div>
-          <div class="agenda-title">Team standup</div>
-          <div class="agenda-loc">Sample event — connect your calendar below</div>
-        </div>
-      </div>
-    </div>
+    <h2><span class="icon">📅</span> This Week's Agenda <span class="source-badge" id="calendar-status">Not connected</span></h2>
+    <div id="agenda-list"></div>
     <div class="calendar-actions">
       <button class="habit-workout-toggle" id="calendar-connect-btn">Connect Calendar</button>
       <button class="habit-workout-toggle" id="calendar-settings-btn">⚙️ Settings</button>
@@ -285,7 +296,7 @@
 
 </div>
 
-<footer>Weather (Open-Meteo) and headlines (Hacker News) are live. Calendar connects to your real Google Calendar once you add an OAuth Client ID. Habits, tasks, and meals reset each day; groceries and the later/someday list persist — all saved locally in your browser.</footer>
+<footer>Weather shows a 7-day forecast (Open-Meteo) and the agenda shows today plus the next 6 days, updating automatically as days pass. Habit tracker shows the last 7 days of history. Calendar connects to your real Google Calendar once you add an OAuth Client ID. Tasks and meals reset each day; habit history, groceries, and the later/someday list persist — all saved locally in your browser.</footer>
 
 <script>
   // ---- Live clock ----
@@ -312,12 +323,42 @@
     return div.innerHTML;
   }
 
-  // ---- Daily state (resets each day): habits, tasks, meals ----
-  const today = new Date().toISOString().slice(0, 10);
+  // ---- Date helpers (local calendar day, not UTC) ----
+  function localDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  // Rolling week starting today, running forward (used for calendar/weather)
+  function getWeekDaysForward() {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + i);
+      const label = i === 0
+        ? `Today · ${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}`
+        : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      days.push({ date: d, dateStr: localDateStr(d), label });
+    }
+    return days;
+  }
+  // Rolling week ending today, running backward (used for habit history — you can't log future habits)
+  function getWeekDaysBackward() {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      days.push({ date: d, dateStr: localDateStr(d), dayLetter: d.toLocaleDateString(undefined, { weekday: 'narrow' }), isToday: i === 0 });
+    }
+    return days;
+  }
+
+  // ---- Daily state (resets each day): tasks, meals ----
+  const today = localDateStr(new Date());
   const DAILY_KEY = 'morning-dashboard';
   function loadState() {
     const raw = localStorage.getItem(DAILY_KEY);
-    const blank = { date: today, steps: 0, protein: 0, workoutDone: false, tasks: [], meals: [] };
+    const blank = { date: today, tasks: [], meals: [] };
     if (!raw) return blank;
     const parsed = JSON.parse(raw);
     if (parsed.date !== today) return blank;
@@ -328,11 +369,11 @@
     localStorage.setItem(DAILY_KEY, JSON.stringify(state));
   }
 
-  // ---- Persistent state (never resets): groceries, backlog, calendar setup ----
+  // ---- Persistent state (never resets): groceries, backlog, calendar setup, habit history ----
   const PERSIST_KEY = 'morning-dashboard-persistent';
   function loadPersistent() {
     const raw = localStorage.getItem(PERSIST_KEY);
-    const blank = { groceries: [], backlog: [], calendarClientId: '' };
+    const blank = { groceries: [], backlog: [], calendarClientId: '', habitHistory: {} };
     if (!raw) return blank;
     return Object.assign(blank, JSON.parse(raw));
   }
@@ -341,42 +382,93 @@
     localStorage.setItem(PERSIST_KEY, JSON.stringify(persistent));
   }
 
-  // ---- Habit tracker ----
+  // ---- Habit tracker (today's entry is editable; history builds up day by day) ----
   const STEPS_GOAL = 10000;
   const PROTEIN_GOAL = 150;
 
-  function renderHabits() {
-    const stepsPct = Math.min(100, (state.steps / STEPS_GOAL) * 100);
-    document.getElementById('steps-bar').style.width = stepsPct + '%';
-    document.getElementById('steps-value').textContent = `${state.steps.toLocaleString()} / ${STEPS_GOAL.toLocaleString()}`;
+  function getHabitDay(dateStr) {
+    if (!persistent.habitHistory[dateStr]) {
+      persistent.habitHistory[dateStr] = { steps: 0, protein: 0, workoutDone: false };
+    }
+    return persistent.habitHistory[dateStr];
+  }
 
-    const proteinPct = Math.min(100, (state.protein / PROTEIN_GOAL) * 100);
+  function pruneHabitHistory() {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffStr = localDateStr(cutoff);
+    Object.keys(persistent.habitHistory).forEach(k => {
+      if (k < cutoffStr) delete persistent.habitHistory[k];
+    });
+  }
+
+  function renderHabits() {
+    const todayHabits = getHabitDay(today);
+    const stepsPct = Math.min(100, (todayHabits.steps / STEPS_GOAL) * 100);
+    document.getElementById('steps-bar').style.width = stepsPct + '%';
+    document.getElementById('steps-value').textContent = `${todayHabits.steps.toLocaleString()} / ${STEPS_GOAL.toLocaleString()}`;
+
+    const proteinPct = Math.min(100, (todayHabits.protein / PROTEIN_GOAL) * 100);
     document.getElementById('protein-bar').style.width = proteinPct + '%';
-    document.getElementById('protein-value').textContent = `${state.protein}g / ${PROTEIN_GOAL}g`;
+    document.getElementById('protein-value').textContent = `${todayHabits.protein}g / ${PROTEIN_GOAL}g`;
 
     const workoutBtn = document.getElementById('workout-toggle');
-    if (state.workoutDone) {
+    if (todayHabits.workoutDone) {
       workoutBtn.textContent = 'Done ✓';
       workoutBtn.classList.add('done');
     } else {
       workoutBtn.textContent = 'Mark done';
       workoutBtn.classList.remove('done');
     }
+
+    renderHabitWeekGrid();
+  }
+
+  function renderHabitWeekGrid() {
+    const days = getWeekDaysBackward();
+    const rows = [
+      { key: 'workout', icon: '🏋️' },
+      { key: 'steps', icon: '👟' },
+      { key: 'protein', icon: '🥩' },
+    ];
+    let html = '<div class="week-grid-row"><div></div>' +
+      days.map(d => `<div class="${d.isToday ? 'week-grid-today' : ''}">${d.dayLetter}</div>`).join('') +
+      '</div>';
+    rows.forEach(row => {
+      html += `<div class="week-grid-row"><div class="week-grid-icon">${row.icon}</div>` +
+        days.map(d => {
+          const habit = persistent.habitHistory[d.dateStr] || { steps: 0, protein: 0, workoutDone: false };
+          let cls = 'week-day-dot';
+          if (row.key === 'workout') {
+            if (habit.workoutDone) cls += ' full';
+          } else {
+            const goal = row.key === 'steps' ? STEPS_GOAL : PROTEIN_GOAL;
+            const val = habit[row.key] || 0;
+            if (val >= goal) cls += ' full';
+            else if (val > 0) cls += ' partial';
+          }
+          return `<div><span class="${cls}"></span></div>`;
+        }).join('') +
+        '</div>';
+    });
+    document.getElementById('habit-week-grid').innerHTML = html;
   }
 
   document.querySelectorAll('.habit-controls button').forEach(btn => {
     btn.addEventListener('click', () => {
       const habit = btn.dataset.habit;
       const delta = parseInt(btn.dataset.delta, 10);
-      state[habit] = Math.max(0, (state[habit] || 0) + delta);
-      saveState();
+      const todayHabits = getHabitDay(today);
+      todayHabits[habit] = Math.max(0, (todayHabits[habit] || 0) + delta);
+      savePersistent();
       renderHabits();
     });
   });
 
   document.getElementById('workout-toggle').addEventListener('click', () => {
-    state.workoutDone = !state.workoutDone;
-    saveState();
+    const todayHabits = getHabitDay(today);
+    todayHabits.workoutDone = !todayHabits.workoutDone;
+    savePersistent();
     renderHabits();
   });
 
@@ -502,8 +594,9 @@
   async function fetchWeather() {
     try {
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
-        `&current=temperature_2m,apparent_temperature,weather_code,is_day&hourly=temperature_2m,weather_code` +
-        `&temperature_unit=fahrenheit&timezone=auto&forecast_days=2`;
+        `&current=temperature_2m,apparent_temperature,weather_code,is_day` +
+        `&daily=temperature_2m_max,temperature_2m_min,weather_code` +
+        `&temperature_unit=fahrenheit&timezone=auto&forecast_days=7`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Weather request failed');
       const data = await res.json();
@@ -514,22 +607,18 @@
       document.getElementById('weather-desc').textContent =
         `${desc} · Feels like ${Math.round(data.current.apparent_temperature)}°F`;
 
-      const times = data.hourly.time;
-      const nowHour = new Date().getHours();
-      let startIdx = times.findIndex(t => new Date(t).getHours() === nowHour);
-      if (startIdx < 0) startIdx = 0;
-
       const forecastEl = document.getElementById('weather-forecast');
       forecastEl.innerHTML = '';
-      for (let i = 0; i < 5; i++) {
-        const idx = startIdx + i * 3;
-        if (idx >= times.length) break;
-        const label = new Date(times[idx]).toLocaleTimeString(undefined, { hour: 'numeric' });
-        const temp = Math.round(data.hourly.temperature_2m[idx]);
+      data.daily.time.forEach((dateStr, i) => {
+        const d = new Date(dateStr + 'T00:00:00');
+        const label = i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' });
+        const [, dayIcon] = weatherInfo(data.daily.weather_code[i], true);
+        const hi = Math.round(data.daily.temperature_2m_max[i]);
+        const lo = Math.round(data.daily.temperature_2m_min[i]);
         const div = document.createElement('div');
-        div.innerHTML = `<div>${label}</div><div class="fc-temp">${temp}°</div>`;
+        div.innerHTML = `<div>${label}</div><div class="fc-icon">${dayIcon}</div><div class="fc-temp">${hi}°</div><div class="fc-lo">${lo}°</div>`;
         forecastEl.appendChild(div);
-      }
+      });
     } catch (err) {
       document.getElementById('weather-desc').textContent = 'Weather unavailable — check your connection.';
     }
@@ -580,41 +669,76 @@
       `<div style="color: var(--danger); font-size: 13px;">${escapeHtml(msg)}</div>`;
   }
 
-  async function fetchCalendarEvents() {
+  function renderAgendaGroups(eventsByDate) {
     const list = document.getElementById('agenda-list');
-    list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Loading events...</div>';
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+    list.innerHTML = '';
+    getWeekDaysForward().forEach(day => {
+      const group = document.createElement('div');
+      group.className = 'agenda-day-group';
+      const header = document.createElement('div');
+      header.className = 'agenda-day-header';
+      header.textContent = day.label;
+      group.appendChild(header);
+
+      const dayEvents = eventsByDate[day.dateStr] || [];
+      if (dayEvents.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'agenda-empty';
+        empty.textContent = 'No events';
+        group.appendChild(empty);
+      } else {
+        dayEvents.forEach(ev => {
+          const item = document.createElement('div');
+          item.className = 'agenda-item';
+          item.innerHTML = `
+            <div class="agenda-time">${ev.time}</div>
+            <div>
+              <div class="agenda-title">${escapeHtml(ev.title)}</div>
+              ${ev.location ? `<div class="agenda-loc">${escapeHtml(ev.location)}</div>` : ''}
+            </div>
+          `;
+          group.appendChild(item);
+        });
+      }
+      list.appendChild(group);
+    });
+  }
+
+  function renderSampleAgenda() {
+    renderAgendaGroups({
+      [today]: [{ time: '9:00 AM', title: 'Team standup', location: 'Sample event — connect your calendar below' }],
+    });
+  }
+
+  async function fetchCalendarEvents() {
+    document.getElementById('agenda-list').innerHTML =
+      '<div style="color: var(--muted); font-size: 13px;">Loading events...</div>';
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfToday);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
     try {
       const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(startOfDay)}` +
-        `&timeMax=${encodeURIComponent(endOfDay)}&singleEvents=true&orderBy=startTime&maxResults=15`,
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(startOfToday.toISOString())}` +
+        `&timeMax=${encodeURIComponent(endOfWeek.toISOString())}&singleEvents=true&orderBy=startTime&maxResults=50`,
         { headers: { Authorization: `Bearer ${calendarAccessToken}` } }
       );
       if (!res.ok) throw new Error(`Calendar API error (${res.status})`);
       const data = await res.json();
-      list.innerHTML = '';
-      if (!data.items || data.items.length === 0) {
-        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No events today. 🎉</div>';
-      } else {
-        data.items.forEach(ev => {
-          const isAllDay = !ev.start.dateTime;
-          const time = isAllDay
-            ? 'All day'
-            : new Date(ev.start.dateTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-          const div = document.createElement('div');
-          div.className = 'agenda-item';
-          div.innerHTML = `
-            <div class="agenda-time">${time}</div>
-            <div>
-              <div class="agenda-title">${escapeHtml(ev.summary || '(no title)')}</div>
-              ${ev.location ? `<div class="agenda-loc">${escapeHtml(ev.location)}</div>` : ''}
-            </div>
-          `;
-          list.appendChild(div);
+
+      const eventsByDate = {};
+      (data.items || []).forEach(ev => {
+        const isAllDay = !ev.start.dateTime;
+        const dateStr = isAllDay ? ev.start.date : localDateStr(new Date(ev.start.dateTime));
+        const time = isAllDay
+          ? 'All day'
+          : new Date(ev.start.dateTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        (eventsByDate[dateStr] = eventsByDate[dateStr] || []).push({
+          time, title: ev.summary || '(no title)', location: ev.location,
         });
-      }
+      });
+
+      renderAgendaGroups(eventsByDate);
       document.getElementById('calendar-status').textContent = 'Connected';
     } catch (err) {
       setAgendaError(err.message);
@@ -671,11 +795,13 @@
   updateCalendarConnectButton();
 
   // ---- Init ----
+  pruneHabitHistory();
   renderHabits();
   renderTasks();
   renderMeals();
   renderGroceries();
   renderBacklog();
+  renderSampleAgenda();
   fetchWeather();
   fetchNews();
 </script>
