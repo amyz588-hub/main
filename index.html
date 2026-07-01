@@ -130,6 +130,7 @@
   .agenda-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
   .agenda-cal { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 3px; }
   .agenda-cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .agenda-item.is-task .agenda-time { color: var(--accent2); }
   .calendar-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   .calendar-settings-panel { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
   .calendar-settings-panel p { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 0 0 10px 0; }
@@ -240,7 +241,7 @@
     <div id="calendar-settings" class="calendar-settings-panel" style="display:none;">
       <p>
         1. In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>, create an OAuth 2.0 Client ID (type: Web application).<br>
-        2. Enable the <strong>Google Calendar API</strong> for that project.<br>
+        2. Enable both the <strong>Google Calendar API</strong> and the <strong>Google Tasks API</strong> for that project (Tasks covers reminders, since Google migrated Reminders into Tasks).<br>
         3. Add this page's exact URL (e.g. http://localhost:8000) to "Authorized JavaScript origins" — <code>file://</code> won't work, serve this page over http(s).<br>
         4. Paste the Client ID below and click Save, then "Sign in with Google".
       </p>
@@ -691,7 +692,7 @@
       } else {
         dayEvents.forEach(ev => {
           const item = document.createElement('div');
-          item.className = 'agenda-item';
+          item.className = 'agenda-item' + (ev.isTask ? ' is-task' : '');
           item.innerHTML = `
             <div class="agenda-time">${ev.time}</div>
             <div>
@@ -750,7 +751,7 @@
         (result.value.items || []).forEach(ev => {
           const isAllDay = !ev.start.dateTime;
           const dateStr = isAllDay ? ev.start.date : localDateStr(new Date(ev.start.dateTime));
-          const timestamp = isAllDay ? -Infinity : new Date(ev.start.dateTime).getTime();
+          const timestamp = isAllDay ? ALL_DAY_SORT_TS : new Date(ev.start.dateTime).getTime();
           const time = isAllDay
             ? 'All day'
             : new Date(ev.start.dateTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -765,6 +766,12 @@
       if (!anyFulfilled && calendars.length > 0) {
         throw new Error('Could not load events from any of your calendars.');
       }
+
+      const taskItems = await fetchGoogleTasks(authHeaders, startOfToday.toISOString(), endOfWeek.toISOString());
+      taskItems.forEach(t => {
+        (eventsByDate[t.dateStr] = eventsByDate[t.dateStr] || []).push(t);
+      });
+
       Object.values(eventsByDate).forEach(list => list.sort((a, b) => a.timestamp - b.timestamp));
 
       renderAgendaGroups(eventsByDate);
@@ -773,6 +780,48 @@
     } catch (err) {
       setAgendaError(err.message);
     }
+  }
+
+  // Sort sentinels: all-day events float to the top of a day, then tasks (no fixed time), then timed events by clock time.
+  const ALL_DAY_SORT_TS = -2;
+  const TASK_SORT_TS = -1;
+
+  async function fetchGoogleTasks(authHeaders, timeMinISO, timeMaxISO) {
+    const items = [];
+    try {
+      const listsRes = await fetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists', authHeaders);
+      if (!listsRes.ok) return items; // older sign-ins without the tasks scope; skip quietly
+      const taskLists = (await listsRes.json()).items || [];
+
+      const results = await Promise.allSettled(taskLists.map(list =>
+        fetch(
+          `https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list.id)}/tasks?showCompleted=false` +
+          `&dueMin=${encodeURIComponent(timeMinISO)}&dueMax=${encodeURIComponent(timeMaxISO)}`,
+          authHeaders
+        ).then(res => (res.ok ? res.json() : { items: [] }))
+      ));
+
+      results.forEach((result, i) => {
+        if (result.status !== 'fulfilled') return;
+        const list = taskLists[i];
+        (result.value.items || []).forEach(task => {
+          if (!task.due || task.status === 'completed') return;
+          items.push({
+            // Task due dates carry no meaningful time-of-day, so bucket by the date substring directly
+            // rather than converting through Date() — that could roll to the wrong local day near midnight UTC.
+            dateStr: task.due.slice(0, 10),
+            time: 'Task', timestamp: TASK_SORT_TS,
+            title: task.title || '(untitled task)', location: null,
+            calendarName: list.title || 'Tasks',
+            calendarColor: 'var(--accent2)',
+            isTask: true,
+          });
+        });
+      });
+    } catch (err) {
+      // Tasks are a bonus layer on top of calendar events; don't fail the whole agenda if this errors.
+    }
+    return items;
   }
 
   function updateCalendarConnectButton() {
@@ -793,7 +842,7 @@
       await loadGis();
       const tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: persistent.calendarClientId,
-        scope: 'https://www.googleapis.com/auth/calendar.readonly',
+        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly',
         callback: async (resp) => {
           if (resp.error) {
             setAgendaError('Sign-in failed: ' + resp.error);
