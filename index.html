@@ -69,6 +69,11 @@
     gap: 8px;
   }
   .card h2 .icon { font-size: 18px; }
+  .subheading {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); margin: 14px 0 8px 0;
+  }
+  .subheading:first-of-type { margin-top: 0; }
 
   /* Weather */
   .weather-main { display: flex; align-items: center; gap: 16px; }
@@ -105,12 +110,22 @@
   .agenda-time { color: var(--accent); font-size: 13px; font-weight: 600; min-width: 60px; }
   .agenda-title { font-size: 14px; }
   .agenda-loc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .calendar-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .calendar-settings-panel { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .calendar-settings-panel p { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 0 0 10px 0; }
+  .calendar-settings-panel a { color: var(--accent); }
 
-  /* Tasks */
+  /* Checklists (tasks / meals / groceries / backlog) */
   .task-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .task-item:last-child { border-bottom: none; }
-  .task-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent2); cursor: pointer; }
+  .task-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent2); cursor: pointer; flex-shrink: 0; }
+  .task-item span { flex: 1; }
   .task-item.checked span { text-decoration: line-through; color: var(--muted); }
+  .task-item .remove-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 17px; line-height: 1; padding: 0 2px; flex-shrink: 0;
+  }
+  .task-item .remove-btn:hover { color: var(--danger); }
   .task-add { display: flex; gap: 8px; margin-top: 12px; }
   .task-add input {
     flex: 1; background: #10162a; border: 1px solid var(--border); border-radius: 8px;
@@ -125,13 +140,16 @@
   .news-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
   .news-item:last-child { border-bottom: none; }
   .news-title { font-size: 14px; }
+  .news-title a { color: var(--text); text-decoration: none; }
+  .news-title a:hover { text-decoration: underline; color: var(--accent); }
   .news-meta { color: var(--muted); font-size: 12px; margin-top: 3px; }
 
-  .mock-badge {
+  .source-badge {
     font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
     color: var(--muted); border: 1px solid var(--border); border-radius: 20px;
     padding: 2px 8px; margin-left: auto;
   }
+  .source-badge a { color: inherit; text-decoration: none; }
   footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; }
 </style>
 </head>
@@ -152,21 +170,15 @@
 
   <!-- Weather -->
   <div class="card">
-    <h2><span class="icon">⛅</span> Weather <span class="mock-badge">mock data</span></h2>
+    <h2><span class="icon">⛅</span> Weather <span class="source-badge"><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo · NYC</a></span></h2>
     <div class="weather-main">
-      <div class="weather-icon">🌤️</div>
+      <div class="weather-icon" id="weather-icon">🌤️</div>
       <div>
-        <div class="weather-temp">68°F</div>
-        <div class="weather-desc">Partly cloudy · Feels like 66°F</div>
+        <div class="weather-temp" id="weather-temp">--°F</div>
+        <div class="weather-desc" id="weather-desc">Loading...</div>
       </div>
     </div>
-    <div class="weather-forecast">
-      <div><div>9am</div><div class="fc-temp">65°</div></div>
-      <div><div>12pm</div><div class="fc-temp">72°</div></div>
-      <div><div>3pm</div><div class="fc-temp">75°</div></div>
-      <div><div>6pm</div><div class="fc-temp">70°</div></div>
-      <div><div>9pm</div><div class="fc-temp">63°</div></div>
-    </div>
+    <div class="weather-forecast" id="weather-forecast"></div>
   </div>
 
   <!-- Habit Tracker -->
@@ -198,33 +210,30 @@
 
   <!-- Agenda -->
   <div class="card">
-    <h2><span class="icon">📅</span> Today's Agenda <span class="mock-badge">mock data</span></h2>
-    <div class="agenda-item">
-      <div class="agenda-time">9:00</div>
-      <div>
-        <div class="agenda-title">Team standup</div>
-        <div class="agenda-loc">Zoom</div>
+    <h2><span class="icon">📅</span> Today's Agenda <span class="source-badge" id="calendar-status">Not connected</span></h2>
+    <div id="agenda-list">
+      <div class="agenda-item">
+        <div class="agenda-time">9:00</div>
+        <div>
+          <div class="agenda-title">Team standup</div>
+          <div class="agenda-loc">Sample event — connect your calendar below</div>
+        </div>
       </div>
     </div>
-    <div class="agenda-item">
-      <div class="agenda-time">11:30</div>
-      <div>
-        <div class="agenda-title">1:1 with manager</div>
-        <div class="agenda-loc">Conference Room B</div>
-      </div>
+    <div class="calendar-actions">
+      <button class="habit-workout-toggle" id="calendar-connect-btn">Connect Calendar</button>
+      <button class="habit-workout-toggle" id="calendar-settings-btn">⚙️ Settings</button>
     </div>
-    <div class="agenda-item">
-      <div class="agenda-time">1:00</div>
-      <div>
-        <div class="agenda-title">Lunch with Sam</div>
-        <div class="agenda-loc">Downtown Cafe</div>
-      </div>
-    </div>
-    <div class="agenda-item">
-      <div class="agenda-time">4:00</div>
-      <div>
-        <div class="agenda-title">Project review</div>
-        <div class="agenda-loc">Zoom</div>
+    <div id="calendar-settings" class="calendar-settings-panel" style="display:none;">
+      <p>
+        1. In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>, create an OAuth 2.0 Client ID (type: Web application).<br>
+        2. Enable the <strong>Google Calendar API</strong> for that project.<br>
+        3. Add this page's exact URL (e.g. http://localhost:8000) to "Authorized JavaScript origins" — <code>file://</code> won't work, serve this page over http(s).<br>
+        4. Paste the Client ID below and click Save, then "Sign in with Google".
+      </p>
+      <div class="task-add">
+        <input type="text" id="calendar-client-id-input" placeholder="Google OAuth Client ID">
+        <button id="calendar-save-btn">Save</button>
       </div>
     </div>
   </div>
@@ -239,30 +248,44 @@
     </div>
   </div>
 
+  <!-- Meals & Groceries -->
+  <div class="card">
+    <h2><span class="icon">🍳</span> Meals &amp; Groceries</h2>
+    <div class="subheading">Meals to make today</div>
+    <div id="meal-list"></div>
+    <div class="task-add">
+      <input type="text" id="meal-input" placeholder="Add a meal...">
+      <button id="meal-add-btn">Add</button>
+    </div>
+    <div class="subheading">Grocery list</div>
+    <div id="grocery-list"></div>
+    <div class="task-add">
+      <input type="text" id="grocery-input" placeholder="Add a grocery item...">
+      <button id="grocery-add-btn">Add</button>
+    </div>
+  </div>
+
+  <!-- Later / Someday -->
+  <div class="card">
+    <h2><span class="icon">🗂️</span> Later / Someday</h2>
+    <div id="backlog-list"></div>
+    <div class="task-add">
+      <input type="text" id="backlog-input" placeholder="Add something for later...">
+      <button id="backlog-add-btn">Add</button>
+    </div>
+  </div>
+
   <!-- News -->
   <div class="card">
-    <h2><span class="icon">📰</span> Headlines <span class="mock-badge">mock data</span></h2>
-    <div class="news-item">
-      <div class="news-title">Markets open higher as tech stocks rally</div>
-      <div class="news-meta">Business · 6 min read</div>
-    </div>
-    <div class="news-item">
-      <div class="news-title">Local city council approves new park funding</div>
-      <div class="news-meta">Local · 3 min read</div>
-    </div>
-    <div class="news-item">
-      <div class="news-title">New study highlights benefits of morning routines</div>
-      <div class="news-meta">Health · 4 min read</div>
-    </div>
-    <div class="news-item">
-      <div class="news-title">Weather service predicts mild week ahead</div>
-      <div class="news-meta">Weather · 2 min read</div>
+    <h2><span class="icon">📰</span> Headlines <span class="source-badge"><a href="https://news.ycombinator.com" target="_blank" rel="noopener">Hacker News</a></span></h2>
+    <div id="news-list">
+      <div style="color: var(--muted); font-size: 13px;">Loading...</div>
     </div>
   </div>
 
 </div>
 
-<footer>Weather, agenda, and headlines are mock data — wire up real APIs when ready. Habits and tasks are saved locally in your browser and reset each day.</footer>
+<footer>Weather (Open-Meteo) and headlines (Hacker News) are live. Calendar connects to your real Google Calendar once you add an OAuth Client ID. Habits, tasks, and meals reset each day; groceries and the later/someday list persist — all saved locally in your browser.</footer>
 
 <script>
   // ---- Live clock ----
@@ -283,18 +306,39 @@
   updateClock();
   setInterval(updateClock, 1000);
 
-  // ---- Storage helpers (reset daily) ----
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---- Daily state (resets each day): habits, tasks, meals ----
   const today = new Date().toISOString().slice(0, 10);
+  const DAILY_KEY = 'morning-dashboard';
   function loadState() {
-    const raw = localStorage.getItem('morning-dashboard');
-    if (!raw) return { date: today, steps: 0, protein: 0, workoutDone: false, tasks: [] };
+    const raw = localStorage.getItem(DAILY_KEY);
+    const blank = { date: today, steps: 0, protein: 0, workoutDone: false, tasks: [], meals: [] };
+    if (!raw) return blank;
     const parsed = JSON.parse(raw);
-    if (parsed.date !== today) return { date: today, steps: 0, protein: 0, workoutDone: false, tasks: [] };
-    return parsed;
+    if (parsed.date !== today) return blank;
+    return Object.assign(blank, parsed);
   }
   let state = loadState();
   function saveState() {
-    localStorage.setItem('morning-dashboard', JSON.stringify(state));
+    localStorage.setItem(DAILY_KEY, JSON.stringify(state));
+  }
+
+  // ---- Persistent state (never resets): groceries, backlog, calendar setup ----
+  const PERSIST_KEY = 'morning-dashboard-persistent';
+  function loadPersistent() {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    const blank = { groceries: [], backlog: [], calendarClientId: '' };
+    if (!raw) return blank;
+    return Object.assign(blank, JSON.parse(raw));
+  }
+  let persistent = loadPersistent();
+  function savePersistent() {
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(persistent));
   }
 
   // ---- Habit tracker ----
@@ -336,52 +380,304 @@
     renderHabits();
   });
 
-  // ---- Tasks ----
-  function renderTasks() {
-    const list = document.getElementById('task-list');
+  // ---- Generic checklist rendering (tasks / meals / groceries) ----
+  function renderChecklist(containerId, items, emptyText, onToggle, onRemove) {
+    const list = document.getElementById(containerId);
     list.innerHTML = '';
-    if (state.tasks.length === 0) {
-      list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No tasks yet. Add one below.</div>';
+    if (items.length === 0) {
+      list.innerHTML = `<div style="color: var(--muted); font-size: 13px;">${emptyText}</div>`;
       return;
     }
-    state.tasks.forEach((task, i) => {
+    items.forEach((item, i) => {
       const row = document.createElement('div');
-      row.className = 'task-item' + (task.done ? ' checked' : '');
+      row.className = 'task-item' + (item.done ? ' checked' : '');
       row.innerHTML = `
-        <input type="checkbox" ${task.done ? 'checked' : ''} data-index="${i}">
-        <span>${escapeHtml(task.text)}</span>
+        <input type="checkbox" ${item.done ? 'checked' : ''}>
+        <span>${escapeHtml(item.text)}</span>
+        <button class="remove-btn" title="Remove">×</button>
       `;
-      row.querySelector('input').addEventListener('change', e => {
-        state.tasks[i].done = e.target.checked;
-        saveState();
-        renderTasks();
-      });
+      row.querySelector('input').addEventListener('change', e => onToggle(i, e.target.checked));
+      row.querySelector('.remove-btn').addEventListener('click', () => onRemove(i));
       list.appendChild(row);
     });
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+  function bindAdd(inputId, buttonId, onAdd) {
+    const input = document.getElementById(inputId);
+    const submit = () => {
+      const text = input.value.trim();
+      if (!text) return;
+      onAdd(text);
+      input.value = '';
+    };
+    document.getElementById(buttonId).addEventListener('click', submit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
   }
 
-  function addTask() {
-    const input = document.getElementById('task-input');
-    const text = input.value.trim();
-    if (!text) return;
+  // ---- Tasks (daily) ----
+  function renderTasks() {
+    renderChecklist('task-list', state.tasks, 'No tasks yet. Add one below.',
+      (i, checked) => { state.tasks[i].done = checked; saveState(); renderTasks(); },
+      (i) => { state.tasks.splice(i, 1); saveState(); renderTasks(); });
+  }
+  bindAdd('task-input', 'task-add-btn', text => {
     state.tasks.push({ text, done: false });
-    input.value = '';
     saveState();
     renderTasks();
-  }
-  document.getElementById('task-add-btn').addEventListener('click', addTask);
-  document.getElementById('task-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addTask();
   });
 
+  // ---- Meals to make today (daily) ----
+  function renderMeals() {
+    renderChecklist('meal-list', state.meals, 'No meals planned yet.',
+      (i, checked) => { state.meals[i].done = checked; saveState(); renderMeals(); },
+      (i) => { state.meals.splice(i, 1); saveState(); renderMeals(); });
+  }
+  bindAdd('meal-input', 'meal-add-btn', text => {
+    state.meals.push({ text, done: false });
+    saveState();
+    renderMeals();
+  });
+
+  // ---- Grocery list (persistent) ----
+  function renderGroceries() {
+    renderChecklist('grocery-list', persistent.groceries, 'No groceries needed. Add an item below.',
+      (i, checked) => { persistent.groceries[i].done = checked; savePersistent(); renderGroceries(); },
+      (i) => { persistent.groceries.splice(i, 1); savePersistent(); renderGroceries(); });
+  }
+  bindAdd('grocery-input', 'grocery-add-btn', text => {
+    persistent.groceries.push({ text, done: false });
+    savePersistent();
+    renderGroceries();
+  });
+
+  // ---- Later / Someday backlog (persistent) ----
+  function renderBacklog() {
+    const list = document.getElementById('backlog-list');
+    list.innerHTML = '';
+    if (persistent.backlog.length === 0) {
+      list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Nothing here yet. Add an idea for later.</div>';
+      return;
+    }
+    persistent.backlog.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'task-item';
+      row.innerHTML = `<span>${escapeHtml(item.text)}</span><button class="remove-btn" title="Remove">×</button>`;
+      row.querySelector('.remove-btn').addEventListener('click', () => {
+        persistent.backlog.splice(i, 1);
+        savePersistent();
+        renderBacklog();
+      });
+      list.appendChild(row);
+    });
+  }
+  bindAdd('backlog-input', 'backlog-add-btn', text => {
+    persistent.backlog.push({ text });
+    savePersistent();
+    renderBacklog();
+  });
+
+  // ---- Weather (live, Open-Meteo, no API key) ----
+  const WEATHER_LAT = 40.7128;
+  const WEATHER_LON = -74.0060;
+
+  function weatherInfo(code, isDay) {
+    const map = {
+      0: ['Clear sky', isDay ? '☀️' : '🌙'],
+      1: ['Mainly clear', isDay ? '🌤️' : '🌙'],
+      2: ['Partly cloudy', isDay ? '⛅' : '☁️'],
+      3: ['Overcast', '☁️'],
+      45: ['Fog', '🌫️'], 48: ['Fog', '🌫️'],
+      51: ['Light drizzle', '🌦️'], 53: ['Drizzle', '🌦️'], 55: ['Heavy drizzle', '🌧️'],
+      56: ['Freezing drizzle', '🌧️'], 57: ['Freezing drizzle', '🌧️'],
+      61: ['Light rain', '🌦️'], 63: ['Rain', '🌧️'], 65: ['Heavy rain', '🌧️'],
+      66: ['Freezing rain', '🌧️'], 67: ['Freezing rain', '🌧️'],
+      71: ['Light snow', '🌨️'], 73: ['Snow', '❄️'], 75: ['Heavy snow', '❄️'], 77: ['Snow grains', '🌨️'],
+      80: ['Rain showers', '🌦️'], 81: ['Rain showers', '🌧️'], 82: ['Violent showers', '⛈️'],
+      85: ['Snow showers', '🌨️'], 86: ['Snow showers', '❄️'],
+      95: ['Thunderstorm', '⛈️'], 96: ['Thunderstorm w/ hail', '⛈️'], 99: ['Thunderstorm w/ hail', '⛈️'],
+    };
+    return map[code] || ['Unknown', '🌡️'];
+  }
+
+  async function fetchWeather() {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}` +
+        `&current=temperature_2m,apparent_temperature,weather_code,is_day&hourly=temperature_2m,weather_code` +
+        `&temperature_unit=fahrenheit&timezone=auto&forecast_days=2`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Weather request failed');
+      const data = await res.json();
+      const [desc, icon] = weatherInfo(data.current.weather_code, data.current.is_day === 1);
+
+      document.getElementById('weather-icon').textContent = icon;
+      document.getElementById('weather-temp').textContent = Math.round(data.current.temperature_2m) + '°F';
+      document.getElementById('weather-desc').textContent =
+        `${desc} · Feels like ${Math.round(data.current.apparent_temperature)}°F`;
+
+      const times = data.hourly.time;
+      const nowHour = new Date().getHours();
+      let startIdx = times.findIndex(t => new Date(t).getHours() === nowHour);
+      if (startIdx < 0) startIdx = 0;
+
+      const forecastEl = document.getElementById('weather-forecast');
+      forecastEl.innerHTML = '';
+      for (let i = 0; i < 5; i++) {
+        const idx = startIdx + i * 3;
+        if (idx >= times.length) break;
+        const label = new Date(times[idx]).toLocaleTimeString(undefined, { hour: 'numeric' });
+        const temp = Math.round(data.hourly.temperature_2m[idx]);
+        const div = document.createElement('div');
+        div.innerHTML = `<div>${label}</div><div class="fc-temp">${temp}°</div>`;
+        forecastEl.appendChild(div);
+      }
+    } catch (err) {
+      document.getElementById('weather-desc').textContent = 'Weather unavailable — check your connection.';
+    }
+  }
+
+  // ---- News (live, Hacker News via Algolia, no API key) ----
+  async function fetchNews() {
+    const list = document.getElementById('news-list');
+    try {
+      const res = await fetch('https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=6');
+      if (!res.ok) throw new Error('News request failed');
+      const data = await res.json();
+      list.innerHTML = '';
+      data.hits.slice(0, 6).forEach(hit => {
+        const url = hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
+        const div = document.createElement('div');
+        div.className = 'news-item';
+        div.innerHTML = `
+          <div class="news-title"><a href="${url}" target="_blank" rel="noopener">${escapeHtml(hit.title)}</a></div>
+          <div class="news-meta">${hit.points} points · ${hit.num_comments || 0} comments</div>
+        `;
+        list.appendChild(div);
+      });
+      if (data.hits.length === 0) {
+        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No headlines right now.</div>';
+      }
+    } catch (err) {
+      list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Headlines unavailable — check your connection.</div>';
+    }
+  }
+
+  // ---- Calendar (live, Google Calendar via OAuth, requires your own Client ID) ----
+  let calendarAccessToken = null;
+
+  function loadGis() {
+    return new Promise((resolve, reject) => {
+      if (window.google && window.google.accounts) { resolve(); return; }
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Failed to load Google Identity Services'));
+      document.head.appendChild(script);
+    });
+  }
+
+  function setAgendaError(msg) {
+    document.getElementById('agenda-list').innerHTML =
+      `<div style="color: var(--danger); font-size: 13px;">${escapeHtml(msg)}</div>`;
+  }
+
+  async function fetchCalendarEvents() {
+    const list = document.getElementById('agenda-list');
+    list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Loading events...</div>';
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(startOfDay)}` +
+        `&timeMax=${encodeURIComponent(endOfDay)}&singleEvents=true&orderBy=startTime&maxResults=15`,
+        { headers: { Authorization: `Bearer ${calendarAccessToken}` } }
+      );
+      if (!res.ok) throw new Error(`Calendar API error (${res.status})`);
+      const data = await res.json();
+      list.innerHTML = '';
+      if (!data.items || data.items.length === 0) {
+        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No events today. 🎉</div>';
+      } else {
+        data.items.forEach(ev => {
+          const isAllDay = !ev.start.dateTime;
+          const time = isAllDay
+            ? 'All day'
+            : new Date(ev.start.dateTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+          const div = document.createElement('div');
+          div.className = 'agenda-item';
+          div.innerHTML = `
+            <div class="agenda-time">${time}</div>
+            <div>
+              <div class="agenda-title">${escapeHtml(ev.summary || '(no title)')}</div>
+              ${ev.location ? `<div class="agenda-loc">${escapeHtml(ev.location)}</div>` : ''}
+            </div>
+          `;
+          list.appendChild(div);
+        });
+      }
+      document.getElementById('calendar-status').textContent = 'Connected';
+    } catch (err) {
+      setAgendaError(err.message);
+    }
+  }
+
+  function updateCalendarConnectButton() {
+    document.getElementById('calendar-connect-btn').textContent =
+      persistent.calendarClientId ? 'Sign in with Google' : 'Connect Calendar';
+  }
+
+  function toggleCalendarSettings(show) {
+    document.getElementById('calendar-settings').style.display = show ? 'block' : 'none';
+  }
+
+  async function connectCalendar() {
+    if (!persistent.calendarClientId) {
+      toggleCalendarSettings(true);
+      return;
+    }
+    try {
+      await loadGis();
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: persistent.calendarClientId,
+        scope: 'https://www.googleapis.com/auth/calendar.readonly',
+        callback: async (resp) => {
+          if (resp.error) {
+            setAgendaError('Sign-in failed: ' + resp.error);
+            return;
+          }
+          calendarAccessToken = resp.access_token;
+          await fetchCalendarEvents();
+        },
+      });
+      tokenClient.requestAccessToken();
+    } catch (err) {
+      setAgendaError('Could not load Google Sign-In: ' + err.message);
+    }
+  }
+
+  document.getElementById('calendar-connect-btn').addEventListener('click', connectCalendar);
+  document.getElementById('calendar-settings-btn').addEventListener('click', () => {
+    const panel = document.getElementById('calendar-settings');
+    toggleCalendarSettings(panel.style.display !== 'block');
+  });
+  document.getElementById('calendar-client-id-input').value = persistent.calendarClientId || '';
+  document.getElementById('calendar-save-btn').addEventListener('click', () => {
+    persistent.calendarClientId = document.getElementById('calendar-client-id-input').value.trim();
+    savePersistent();
+    updateCalendarConnectButton();
+    toggleCalendarSettings(false);
+    if (persistent.calendarClientId) connectCalendar();
+  });
+  updateCalendarConnectButton();
+
+  // ---- Init ----
   renderHabits();
   renderTasks();
+  renderMeals();
+  renderGroceries();
+  renderBacklog();
+  fetchWeather();
+  fetchNews();
 </script>
 
 </body>
