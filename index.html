@@ -254,6 +254,8 @@
         <input type="text" id="calendar-names-input" placeholder="Calendar names to include, comma-separated (blank = all)">
         <button id="calendar-save-btn">Save</button>
       </div>
+      <button class="habit-workout-toggle" id="calendar-list-btn" style="margin-top: 10px;">List my calendars</button>
+      <div id="calendar-list-output" style="font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.6;"></div>
     </div>
   </div>
 
@@ -889,6 +891,30 @@
       setAgendaError('Could not load Google Sign-In: ' + err.message);
     }
   }
+
+  document.getElementById('calendar-list-btn').addEventListener('click', async () => {
+    const output = document.getElementById('calendar-list-output');
+    if (!calendarAccessToken) {
+      output.textContent = 'Click "Sign in with Google" first, then come back and try this again.';
+      return;
+    }
+    output.textContent = 'Loading...';
+    try {
+      const res = await fetch(
+        'https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader',
+        { headers: { Authorization: `Bearer ${calendarAccessToken}` } }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rows = (data.items || []).map(cal => {
+        const name = cal.summaryOverride || cal.summary || cal.id;
+        return escapeHtml(name) + (cal.selected === false ? ' <em>(hidden in your sidebar)</em>' : '');
+      });
+      output.innerHTML = rows.length ? rows.join('<br>') : 'No calendars found for this account.';
+    } catch (err) {
+      output.textContent = 'Could not list calendars: ' + err.message;
+    }
+  });
 
   document.getElementById('calendar-connect-btn').addEventListener('click', connectCalendar);
   document.getElementById('calendar-settings-btn').addEventListener('click', () => {
