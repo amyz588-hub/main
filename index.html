@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Morning Dashboard</title>
+<title>Ami's Morning Dashboard</title>
 <style>
   :root {
     --bg: #0f1420;
@@ -76,15 +76,21 @@
   .subheading:first-of-type { margin-top: 0; }
 
   /* Weather */
-  .weather-main { display: flex; align-items: center; gap: 16px; }
+  .weather-banner { margin-bottom: 18px; }
+  .weather-banner-row { display: flex; align-items: center; gap: 32px; }
+  .weather-main { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
   .weather-temp { font-size: 48px; font-weight: 700; }
   .weather-icon { font-size: 48px; }
   .weather-desc { color: var(--muted); font-size: 14px; }
-  .weather-forecast { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .weather-forecast { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; flex: 1; }
   .weather-forecast div { text-align: center; font-size: 12px; color: var(--muted); }
   .weather-forecast .fc-icon { font-size: 16px; margin: 2px 0; }
   .weather-forecast .fc-temp { color: var(--text); font-weight: 600; font-size: 13px; }
   .weather-forecast .fc-lo { color: var(--muted); font-size: 11px; }
+  @media (max-width: 700px) {
+    .weather-banner-row { flex-direction: column; align-items: stretch; gap: 16px; }
+    .weather-forecast { border-top: 1px solid var(--border); padding-top: 12px; }
+  }
 
   /* Habits */
   .habit-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -113,6 +119,7 @@
   .week-grid-icon { font-size: 13px; }
   .week-day-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #10162a; border: 1px solid var(--border); }
   .week-day-dot.full { background: var(--accent2); border-color: var(--accent2); }
+  .week-grid-checkbox { width: 14px; height: 14px; accent-color: var(--accent2); cursor: pointer; }
   .week-day-dot.partial { background: rgba(255, 180, 84, 0.5); border-color: var(--accent); }
 
   /* Agenda */
@@ -178,20 +185,17 @@
 
 <header>
   <div>
-    <h1 id="greeting">Good morning</h1>
-    <div class="greeting" id="subgreeting">Here's your day at a glance.</div>
+    <h1>Ami's Morning Dashboard</h1>
+    <div class="greeting" id="date">--</div>
   </div>
   <div>
     <div id="clock">--:--:--</div>
-    <div id="date">--</div>
   </div>
 </header>
 
-<div class="grid">
-
-  <!-- Weather -->
-  <div class="card">
-    <h2><span class="icon">⛅</span> Weather · 7 Day <span class="source-badge"><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo · NYC</a></span></h2>
+<div class="card weather-banner">
+  <h2><span class="icon">⛅</span> Weather · 7 Day <span class="source-badge"><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo · NYC</a></span></h2>
+  <div class="weather-banner-row">
     <div class="weather-main">
       <div class="weather-icon" id="weather-icon">🌤️</div>
       <div>
@@ -201,32 +205,27 @@
     </div>
     <div class="weather-forecast" id="weather-forecast"></div>
   </div>
+</div>
 
-  <!-- Habit Tracker -->
+<div class="grid">
+
+  <!-- Tasks -->
   <div class="card">
-    <h2><span class="icon">✅</span> Habit Tracker · 7 Day</h2>
-    <div class="week-grid" id="habit-week-grid"></div>
-    <div class="habit-row">
-      <div class="habit-label"><span class="icon">🏋️</span> Workout</div>
-      <button class="habit-workout-toggle" id="workout-toggle">Mark done</button>
+    <h2><span class="icon">📝</span> Tasks</h2>
+    <div id="task-list"></div>
+    <div class="task-add">
+      <input type="text" id="task-input" placeholder="Add a task...">
+      <button id="task-add-btn">Add</button>
     </div>
-    <div class="habit-row">
-      <div class="habit-label"><span class="icon">👟</span> Steps</div>
-      <div class="habit-progress-wrap"><div class="habit-progress-bar" id="steps-bar"></div></div>
-      <div class="habit-value" id="steps-value">0 / 10,000</div>
-      <div class="habit-controls">
-        <button data-habit="steps" data-delta="-500">-</button>
-        <button data-habit="steps" data-delta="500">+</button>
-      </div>
-    </div>
-    <div class="habit-row">
-      <div class="habit-label"><span class="icon">🥩</span> Protein</div>
-      <div class="habit-progress-wrap"><div class="habit-progress-bar" id="protein-bar"></div></div>
-      <div class="habit-value" id="protein-value">0 / 150g</div>
-      <div class="habit-controls">
-        <button data-habit="protein" data-delta="-10">-</button>
-        <button data-habit="protein" data-delta="10">+</button>
-      </div>
+  </div>
+
+  <!-- Later / Someday -->
+  <div class="card">
+    <h2><span class="icon">🗂️</span> Later / Someday</h2>
+    <div id="backlog-list"></div>
+    <div class="task-add">
+      <input type="text" id="backlog-input" placeholder="Add something for later...">
+      <button id="backlog-add-btn">Add</button>
     </div>
   </div>
 
@@ -259,16 +258,6 @@
     </div>
   </div>
 
-  <!-- Tasks -->
-  <div class="card">
-    <h2><span class="icon">📝</span> Tasks</h2>
-    <div id="task-list"></div>
-    <div class="task-add">
-      <input type="text" id="task-input" placeholder="Add a task...">
-      <button id="task-add-btn">Add</button>
-    </div>
-  </div>
-
   <!-- Meals & Groceries -->
   <div class="card">
     <h2><span class="icon">🍳</span> Meals &amp; Groceries</h2>
@@ -286,21 +275,35 @@
     </div>
   </div>
 
-  <!-- Later / Someday -->
+  <!-- News -->
   <div class="card">
-    <h2><span class="icon">🗂️</span> Later / Someday</h2>
-    <div id="backlog-list"></div>
-    <div class="task-add">
-      <input type="text" id="backlog-input" placeholder="Add something for later...">
-      <button id="backlog-add-btn">Add</button>
+    <h2><span class="icon">📰</span> Headlines <span class="source-badge"><a href="https://reddit.com" target="_blank" rel="noopener">Reddit</a></span></h2>
+    <div id="news-list">
+      <div style="color: var(--muted); font-size: 13px;">Loading...</div>
     </div>
   </div>
 
-  <!-- News -->
+  <!-- Habit Tracker -->
   <div class="card">
-    <h2><span class="icon">📰</span> Headlines <span class="source-badge"><a href="https://news.ycombinator.com" target="_blank" rel="noopener">Hacker News</a></span></h2>
-    <div id="news-list">
-      <div style="color: var(--muted); font-size: 13px;">Loading...</div>
+    <h2><span class="icon">✅</span> Habit Tracker · This Week</h2>
+    <div class="week-grid" id="habit-week-grid"></div>
+    <div class="habit-row">
+      <div class="habit-label"><span class="icon">👟</span> Steps</div>
+      <div class="habit-progress-wrap"><div class="habit-progress-bar" id="steps-bar"></div></div>
+      <div class="habit-value" id="steps-value">0 / 10,000</div>
+      <div class="habit-controls">
+        <button data-habit="steps" data-delta="-500">-</button>
+        <button data-habit="steps" data-delta="500">+</button>
+      </div>
+    </div>
+    <div class="habit-row">
+      <div class="habit-label"><span class="icon">🥩</span> Protein</div>
+      <div class="habit-progress-wrap"><div class="habit-progress-bar" id="protein-bar"></div></div>
+      <div class="habit-value" id="protein-value">0 / 150g</div>
+      <div class="habit-controls">
+        <button data-habit="protein" data-delta="-10">-</button>
+        <button data-habit="protein" data-delta="10">+</button>
+      </div>
     </div>
   </div>
 
@@ -317,12 +320,6 @@
       `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     document.getElementById('date').textContent =
       now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const hour = now.getHours();
-    const greeting = document.getElementById('greeting');
-    if (hour < 12) greeting.textContent = 'Good morning';
-    else if (hour < 18) greeting.textContent = 'Good afternoon';
-    else greeting.textContent = 'Good evening';
   }
   updateClock();
   setInterval(updateClock, 1000);
@@ -351,14 +348,18 @@
     }
     return days;
   }
-  // Rolling week ending today, running backward (used for habit history — you can't log future habits)
-  function getWeekDaysBackward() {
+  // The actual calendar week (Sunday through Saturday) containing today — not a rolling window.
+  function getCurrentWeekDays() {
     const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - i);
-      days.push({ date: d, dateStr: localDateStr(d), dayLetter: d.toLocaleDateString(undefined, { weekday: 'narrow' }), isToday: i === 0 });
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      const dateStr = localDateStr(d);
+      days.push({ date: d, dateStr, dayLetter: d.toLocaleDateString(undefined, { weekday: 'narrow' }), isToday: dateStr === today });
     }
     return days;
   }
@@ -422,47 +423,43 @@
     document.getElementById('protein-bar').style.width = proteinPct + '%';
     document.getElementById('protein-value').textContent = `${todayHabits.protein}g / ${PROTEIN_GOAL}g`;
 
-    const workoutBtn = document.getElementById('workout-toggle');
-    if (todayHabits.workoutDone) {
-      workoutBtn.textContent = 'Done ✓';
-      workoutBtn.classList.add('done');
-    } else {
-      workoutBtn.textContent = 'Mark done';
-      workoutBtn.classList.remove('done');
-    }
-
     renderHabitWeekGrid();
   }
 
   function renderHabitWeekGrid() {
-    const days = getWeekDaysBackward();
-    const rows = [
-      { key: 'workout', icon: '🏋️' },
-      { key: 'steps', icon: '👟' },
-      { key: 'protein', icon: '🥩' },
-    ];
+    const days = getCurrentWeekDays();
     let html = '<div class="week-grid-row"><div></div>' +
       days.map(d => `<div class="${d.isToday ? 'week-grid-today' : ''}">${d.dayLetter}</div>`).join('') +
       '</div>';
-    rows.forEach(row => {
+
+    html += '<div class="week-grid-row"><div class="week-grid-icon">🏋️</div>' +
+      days.map(d => {
+        const habit = persistent.habitHistory[d.dateStr] || { workoutDone: false };
+        return `<div><input type="checkbox" class="week-grid-checkbox" data-workout-date="${d.dateStr}" ${habit.workoutDone ? 'checked' : ''}></div>`;
+      }).join('') +
+      '</div>';
+
+    [{ key: 'steps', icon: '👟' }, { key: 'protein', icon: '🥩' }].forEach(row => {
       html += `<div class="week-grid-row"><div class="week-grid-icon">${row.icon}</div>` +
         days.map(d => {
-          const habit = persistent.habitHistory[d.dateStr] || { steps: 0, protein: 0, workoutDone: false };
+          const habit = persistent.habitHistory[d.dateStr] || { steps: 0, protein: 0 };
+          const goal = row.key === 'steps' ? STEPS_GOAL : PROTEIN_GOAL;
+          const val = habit[row.key] || 0;
           let cls = 'week-day-dot';
-          if (row.key === 'workout') {
-            if (habit.workoutDone) cls += ' full';
-          } else {
-            const goal = row.key === 'steps' ? STEPS_GOAL : PROTEIN_GOAL;
-            const val = habit[row.key] || 0;
-            if (val >= goal) cls += ' full';
-            else if (val > 0) cls += ' partial';
-          }
+          if (val >= goal) cls += ' full';
+          else if (val > 0) cls += ' partial';
           return `<div><span class="${cls}"></span></div>`;
         }).join('') +
         '</div>';
     });
     document.getElementById('habit-week-grid').innerHTML = html;
   }
+
+  document.getElementById('habit-week-grid').addEventListener('change', e => {
+    if (!e.target.matches('input[data-workout-date]')) return;
+    getHabitDay(e.target.dataset.workoutDate).workoutDone = e.target.checked;
+    savePersistent();
+  });
 
   document.querySelectorAll('.habit-controls button').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -473,13 +470,6 @@
       savePersistent();
       renderHabits();
     });
-  });
-
-  document.getElementById('workout-toggle').addEventListener('click', () => {
-    const todayHabits = getHabitDay(today);
-    todayHabits.workoutDone = !todayHabits.workoutDone;
-    savePersistent();
-    renderHabits();
   });
 
   // ---- Generic checklist rendering (tasks / meals / groceries) ----
@@ -634,27 +624,47 @@
     }
   }
 
-  // ---- News (live, Hacker News via Algolia, no API key) ----
+  // ---- News (live, Reddit's public JSON API, no API key) ----
+  // Personalized to health, pop culture, and world events instead of one general feed.
+  const NEWS_CATEGORIES = [
+    { sub: 'health', label: 'Health' },
+    { sub: 'entertainment', label: 'Pop Culture' },
+    { sub: 'worldnews', label: 'World' },
+  ];
+
   async function fetchNews() {
     const list = document.getElementById('news-list');
     try {
-      const res = await fetch('https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=6');
-      if (!res.ok) throw new Error('News request failed');
-      const data = await res.json();
+      const results = await Promise.allSettled(NEWS_CATEGORIES.map(cat =>
+        fetch(`https://www.reddit.com/r/${cat.sub}/top.json?limit=3&t=day`).then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+      ));
+
+      const items = [];
+      results.forEach((result, i) => {
+        if (result.status !== 'fulfilled') return;
+        const cat = NEWS_CATEGORIES[i];
+        (result.value.data.children || []).forEach(child => {
+          const post = child.data;
+          const url = post.url && !post.is_self ? post.url : `https://reddit.com${post.permalink}`;
+          items.push({ title: post.title, url, points: post.ups, comments: post.num_comments, category: cat.label });
+        });
+      });
+
+      if (items.length === 0) throw new Error('No headlines available right now.');
+
       list.innerHTML = '';
-      data.hits.slice(0, 6).forEach(hit => {
-        const url = hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
+      items.forEach(item => {
         const div = document.createElement('div');
         div.className = 'news-item';
         div.innerHTML = `
-          <div class="news-title"><a href="${url}" target="_blank" rel="noopener">${escapeHtml(hit.title)}</a></div>
-          <div class="news-meta">${hit.points} points · ${hit.num_comments || 0} comments</div>
+          <div class="news-title"><a href="${item.url}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a></div>
+          <div class="news-meta">${item.category} · ${item.points} points · ${item.comments} comments</div>
         `;
         list.appendChild(div);
       });
-      if (data.hits.length === 0) {
-        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No headlines right now.</div>';
-      }
     } catch (err) {
       list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Headlines unavailable — check your connection.</div>';
     }
