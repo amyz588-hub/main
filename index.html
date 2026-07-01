@@ -234,6 +234,7 @@
   <div class="card">
     <h2><span class="icon">📅</span> This Week's Agenda <span class="source-badge" id="calendar-status">Not connected</span></h2>
     <div id="agenda-list"></div>
+    <div id="agenda-warning" style="display:none; color: var(--danger); font-size: 12px; margin-top: 10px;"></div>
     <div class="calendar-actions">
       <button class="habit-workout-toggle" id="calendar-connect-btn">Connect Calendar</button>
       <button class="habit-workout-toggle" id="calendar-settings-btn">⚙️ Settings</button>
@@ -716,11 +717,13 @@
     renderAgendaGroups({
       [today]: [{ time: '9:00 AM', title: 'Team standup', location: 'Sample event — connect your calendar below' }],
     });
+    document.getElementById('agenda-warning').style.display = 'none';
   }
 
   async function fetchCalendarEvents() {
     document.getElementById('agenda-list').innerHTML =
       '<div style="color: var(--muted); font-size: 13px;">Loading events...</div>';
+    document.getElementById('agenda-warning').style.display = 'none';
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const endOfWeek = new Date(startOfToday);
@@ -754,17 +757,19 @@
           `&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
           authHeaders
         ).then(res => {
-          if (!res.ok) throw new Error(`${displayName(cal)}: ${res.status}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
         })
       ));
 
       const eventsByDate = {};
-      let anyFulfilled = false;
+      const failedCalendars = [];
       results.forEach((result, i) => {
-        if (result.status !== 'fulfilled') return;
-        anyFulfilled = true;
         const cal = calendars[i];
+        if (result.status !== 'fulfilled') {
+          failedCalendars.push({ name: displayName(cal), reason: result.reason ? result.reason.message : 'unknown error' });
+          return;
+        }
         (result.value.items || []).forEach(ev => {
           const isAllDay = !ev.start.dateTime;
           const dateStr = isAllDay ? ev.start.date : localDateStr(new Date(ev.start.dateTime));
@@ -780,7 +785,7 @@
         });
       });
 
-      if (!anyFulfilled && calendars.length > 0) {
+      if (failedCalendars.length === calendars.length && calendars.length > 0) {
         throw new Error('Could not load events from any of your calendars.');
       }
 
@@ -792,8 +797,18 @@
       Object.values(eventsByDate).forEach(list => list.sort((a, b) => a.timestamp - b.timestamp));
 
       renderAgendaGroups(eventsByDate);
-      document.getElementById('calendar-status').textContent =
-        calendars.length > 1 ? `Connected · ${calendars.length} calendars` : 'Connected';
+      const successCount = calendars.length - failedCalendars.length;
+      document.getElementById('calendar-status').textContent = failedCalendars.length > 0
+        ? `Connected · ${successCount}/${calendars.length} calendars`
+        : (calendars.length > 1 ? `Connected · ${calendars.length} calendars` : 'Connected');
+
+      const warningEl = document.getElementById('agenda-warning');
+      if (failedCalendars.length > 0) {
+        warningEl.textContent = 'Could not load: ' + failedCalendars.map(f => `${f.name} (${f.reason})`).join('; ');
+        warningEl.style.display = 'block';
+      } else {
+        warningEl.style.display = 'none';
+      }
     } catch (err) {
       setAgendaError(err.message);
     }
