@@ -980,21 +980,33 @@
   // return window, since actual retailer policies vary and aren't available from the email itself.
   const RETURN_WINDOW_DAYS = 30;
 
+  const PURCHASE_KEYWORD_QUERY =
+    'newer_than:40d (subject:receipt OR subject:invoice OR subject:"order confirmation" OR ' +
+    'subject:"your order" OR subject:shipped OR subject:"thank you for your order" OR subject:"order confirmed")';
+
+  async function searchGmailMessages(query, authHeaders) {
+    const res = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent(query) + '&maxResults=10',
+      authHeaders
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()).messages || [];
+  }
+
   async function fetchPurchases() {
     const list = document.getElementById('purchases-list');
     list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Loading purchases...</div>';
     const authHeaders = { headers: { Authorization: `Bearer ${calendarAccessToken}` } };
     try {
-      const listRes = await fetch(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' +
-        encodeURIComponent('label:CATEGORY_PURCHASES newer_than:40d') + '&maxResults=10',
-        authHeaders
-      );
-      if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
-      const messageRefs = (await listRes.json()).messages || [];
+      let messageRefs = await searchGmailMessages('label:CATEGORY_PURCHASES newer_than:40d', authHeaders);
+      let usedFallback = false;
+      if (messageRefs.length === 0) {
+        messageRefs = await searchGmailMessages(PURCHASE_KEYWORD_QUERY, authHeaders);
+        usedFallback = true;
+      }
 
       if (messageRefs.length === 0) {
-        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No recent purchase emails found in the last 40 days.</div>';
+        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">No purchase emails found in the last 40 days (checked Gmail\'s Purchases category and common receipt keywords).</div>';
         document.getElementById('purchases-status').textContent = 'Connected';
         return;
       }
@@ -1049,7 +1061,8 @@
         list.appendChild(div);
       });
 
-      document.getElementById('purchases-status').textContent = `Connected · ${items.length} tracked`;
+      document.getElementById('purchases-status').textContent =
+        `Connected · ${items.length} tracked${usedFallback ? ' (keyword search)' : ''}`;
     } catch (err) {
       list.innerHTML = `<div style="color: var(--danger); font-size: 13px;">Could not load purchases: ${escapeHtml(err.message)}</div>`;
     }
