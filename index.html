@@ -128,6 +128,8 @@
     padding-bottom: 4px; border-bottom: 1px solid var(--border); margin-bottom: 2px;
   }
   .agenda-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+  .agenda-cal { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .agenda-cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .calendar-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   .calendar-settings-panel { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
   .calendar-settings-panel p { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 0 0 10px 0; }
@@ -695,6 +697,7 @@
             <div>
               <div class="agenda-title">${escapeHtml(ev.title)}</div>
               ${ev.location ? `<div class="agenda-loc">${escapeHtml(ev.location)}</div>` : ''}
+              ${ev.calendarName ? `<div class="agenda-cal"><span class="agenda-cal-dot" style="background:${ev.calendarColor}"></span>${escapeHtml(ev.calendarName)}</div>` : ''}
             </div>
           `;
           group.appendChild(item);
@@ -717,29 +720,56 @@
     startOfToday.setHours(0, 0, 0, 0);
     const endOfWeek = new Date(startOfToday);
     endOfWeek.setDate(endOfWeek.getDate() + 7);
+    const timeMin = encodeURIComponent(startOfToday.toISOString());
+    const timeMax = encodeURIComponent(endOfWeek.toISOString());
+    const authHeaders = { headers: { Authorization: `Bearer ${calendarAccessToken}` } };
+
     try {
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(startOfToday.toISOString())}` +
-        `&timeMax=${encodeURIComponent(endOfWeek.toISOString())}&singleEvents=true&orderBy=startTime&maxResults=50`,
-        { headers: { Authorization: `Bearer ${calendarAccessToken}` } }
-      );
-      if (!res.ok) throw new Error(`Calendar API error (${res.status})`);
-      const data = await res.json();
+      const listRes = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader', authHeaders);
+      if (!listRes.ok) throw new Error(`Calendar list error (${listRes.status})`);
+      const listData = await listRes.json();
+      const calendars = (listData.items || []).filter(cal => cal.selected !== false);
+
+      const results = await Promise.allSettled(calendars.map(cal =>
+        fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?timeMin=${timeMin}` +
+          `&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
+          authHeaders
+        ).then(res => {
+          if (!res.ok) throw new Error(`${cal.summary || cal.id}: ${res.status}`);
+          return res.json();
+        })
+      ));
 
       const eventsByDate = {};
-      (data.items || []).forEach(ev => {
-        const isAllDay = !ev.start.dateTime;
-        const dateStr = isAllDay ? ev.start.date : localDateStr(new Date(ev.start.dateTime));
-        const time = isAllDay
-          ? 'All day'
-          : new Date(ev.start.dateTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-        (eventsByDate[dateStr] = eventsByDate[dateStr] || []).push({
-          time, title: ev.summary || '(no title)', location: ev.location,
+      let anyFulfilled = false;
+      results.forEach((result, i) => {
+        if (result.status !== 'fulfilled') return;
+        anyFulfilled = true;
+        const cal = calendars[i];
+        (result.value.items || []).forEach(ev => {
+          const isAllDay = !ev.start.dateTime;
+          const dateStr = isAllDay ? ev.start.date : localDateStr(new Date(ev.start.dateTime));
+          const timestamp = isAllDay ? -Infinity : new Date(ev.start.dateTime).getTime();
+          const time = isAllDay
+            ? 'All day'
+            : new Date(ev.start.dateTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+          (eventsByDate[dateStr] = eventsByDate[dateStr] || []).push({
+            time, timestamp, title: ev.summary || '(no title)', location: ev.location,
+            calendarName: calendars.length > 1 ? (cal.summary || cal.id) : null,
+            calendarColor: cal.backgroundColor || 'var(--muted)',
+          });
         });
       });
 
+      if (!anyFulfilled && calendars.length > 0) {
+        throw new Error('Could not load events from any of your calendars.');
+      }
+      Object.values(eventsByDate).forEach(list => list.sort((a, b) => a.timestamp - b.timestamp));
+
       renderAgendaGroups(eventsByDate);
-      document.getElementById('calendar-status').textContent = 'Connected';
+      document.getElementById('calendar-status').textContent =
+        calendars.length > 1 ? `Connected · ${calendars.length} calendars` : 'Connected';
     } catch (err) {
       setAgendaError(err.message);
     }
