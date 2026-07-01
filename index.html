@@ -243,10 +243,14 @@
         1. In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>, create an OAuth 2.0 Client ID (type: Web application).<br>
         2. Enable both the <strong>Google Calendar API</strong> and the <strong>Google Tasks API</strong> for that project (Tasks covers reminders, since Google migrated Reminders into Tasks).<br>
         3. Add this page's exact URL (e.g. http://localhost:8000) to "Authorized JavaScript origins" — <code>file://</code> won't work, serve this page over http(s).<br>
-        4. Paste the Client ID below and click Save, then "Sign in with Google".
+        4. Paste the Client ID below. Optionally list specific calendar names to include (comma-separated) — this pulls those calendars even if they're hidden/unselected in your Google Calendar sidebar. Leave blank to include all your visible calendars.<br>
+        5. Click Save, then "Sign in with Google".
       </p>
       <div class="task-add">
         <input type="text" id="calendar-client-id-input" placeholder="Google OAuth Client ID">
+      </div>
+      <div class="task-add">
+        <input type="text" id="calendar-names-input" placeholder="Calendar names to include, comma-separated (blank = all)">
         <button id="calendar-save-btn">Save</button>
       </div>
     </div>
@@ -376,7 +380,7 @@
   const PERSIST_KEY = 'morning-dashboard-persistent';
   function loadPersistent() {
     const raw = localStorage.getItem(PERSIST_KEY);
-    const blank = { groceries: [], backlog: [], calendarClientId: '', habitHistory: {} };
+    const blank = { groceries: [], backlog: [], calendarClientId: '', calendarNames: [], habitHistory: {} };
     if (!raw) return blank;
     return Object.assign(blank, JSON.parse(raw));
   }
@@ -729,7 +733,17 @@
       const listRes = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader', authHeaders);
       if (!listRes.ok) throw new Error(`Calendar list error (${listRes.status})`);
       const listData = await listRes.json();
-      const calendars = (listData.items || []).filter(cal => cal.selected !== false);
+      const nameFilters = persistent.calendarNames || [];
+      const calendars = nameFilters.length > 0
+        ? (listData.items || []).filter(cal => {
+            const summary = (cal.summary || '').toLowerCase();
+            return nameFilters.some(name => summary.includes(name));
+          })
+        : (listData.items || []).filter(cal => cal.selected !== false);
+
+      if (nameFilters.length > 0 && calendars.length === 0) {
+        throw new Error('No calendars matched the names in Settings — check the spelling against your Google Calendar sidebar.');
+      }
 
       const results = await Promise.allSettled(calendars.map(cal =>
         fetch(
@@ -864,8 +878,11 @@
     toggleCalendarSettings(panel.style.display !== 'block');
   });
   document.getElementById('calendar-client-id-input').value = persistent.calendarClientId || '';
+  document.getElementById('calendar-names-input').value = (persistent.calendarNames || []).join(', ');
   document.getElementById('calendar-save-btn').addEventListener('click', () => {
     persistent.calendarClientId = document.getElementById('calendar-client-id-input').value.trim();
+    persistent.calendarNames = document.getElementById('calendar-names-input').value
+      .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     savePersistent();
     updateCalendarConnectButton();
     toggleCalendarSettings(false);
