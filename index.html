@@ -39,13 +39,7 @@
     font-weight: 700;
   }
   header .greeting { color: var(--muted); font-size: 15px; margin-top: 4px; }
-  #clock {
-    font-size: 40px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 1px;
-  }
-  #date { color: var(--muted); text-align: right; font-size: 14px; }
+  #date { color: var(--muted); font-size: 15px; margin-top: 4px; }
 
   .grid {
     display: grid;
@@ -197,9 +191,6 @@
     <h1>Ami's Morning Dashboard</h1>
     <div class="greeting" id="date">--</div>
   </div>
-  <div>
-    <div id="clock">--:--:--</div>
-  </div>
 </header>
 
 <div class="card weather-banner">
@@ -269,9 +260,9 @@
 
   <!-- Inbox -->
   <div class="card">
-    <h2><span class="icon">📧</span> Inbox <span class="source-badge" id="gmail-status">Not connected</span></h2>
+    <h2><span class="icon">📧</span> Priority Inbox <span class="source-badge" id="gmail-status">Not connected</span></h2>
     <div id="gmail-list">
-      <div style="color: var(--muted); font-size: 13px;">Unread email previews show up here once you sign in with Google (Agenda card) — Gmail uses the same sign-in.</div>
+      <div style="color: var(--muted); font-size: 13px;">Important, unread email previews show up here once you sign in with Google (Agenda card) — Gmail uses the same sign-in.</div>
     </div>
   </div>
 
@@ -294,9 +285,23 @@
 
   <!-- News -->
   <div class="card">
-    <h2><span class="icon">📰</span> Headlines <span class="source-badge"><a href="https://reddit.com" target="_blank" rel="noopener">Reddit</a></span></h2>
+    <h2><span class="icon">📰</span> Headlines <span class="source-badge"><a href="https://newsapi.org" target="_blank" rel="noopener">NewsAPI.org</a></span></h2>
     <div id="news-list">
       <div style="color: var(--muted); font-size: 13px;">Loading...</div>
+    </div>
+    <div class="calendar-actions">
+      <button class="habit-workout-toggle" id="news-settings-btn">⚙️ Settings</button>
+    </div>
+    <div id="news-settings" class="calendar-settings-panel" style="display:none;">
+      <p>
+        1. Sign up free at <a href="https://newsapi.org/register" target="_blank" rel="noopener">newsapi.org</a> and copy your API key.<br>
+        2. Paste it below and click Save.<br>
+        3. Note: NewsAPI's free plan only allows requests from <code>localhost</code> — same requirement as the Google sign-in, so if that's already working, this will too.
+      </p>
+      <div class="task-add">
+        <input type="text" id="news-api-key-input" placeholder="NewsAPI.org API key">
+        <button id="news-save-btn">Save</button>
+      </div>
     </div>
   </div>
 
@@ -326,20 +331,16 @@
 
 </div>
 
-<footer>Weather shows a 7-day forecast (Open-Meteo) and the agenda shows today plus the next 6 days, updating automatically as days pass. Habit tracker shows the last 7 days of history. Calendar connects to your real Google Calendar once you add an OAuth Client ID. Tasks and meals reset each day; habit history, groceries, and the later/someday list persist — all saved locally in your browser.</footer>
+<footer>Weather shows a 7-day forecast (Open-Meteo) and the agenda shows today plus the next 6 days, updating automatically as days pass. Habit tracker shows the actual Sun–Sat calendar week. Calendar, Inbox, and Tasks/Meals/Groceries integrations connect to your real Google account once you add an OAuth Client ID. Meals reset each day; tasks, groceries, habit history, and the later/someday list persist until you remove them — all saved locally in your browser.</footer>
 
 <script>
-  // ---- Live clock ----
-  function pad(n) { return n.toString().padStart(2, '0'); }
-  function updateClock() {
-    const now = new Date();
-    document.getElementById('clock').textContent =
-      `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  // ---- Date display ----
+  function updateDate() {
     document.getElementById('date').textContent =
-      now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   }
-  updateClock();
-  setInterval(updateClock, 1000);
+  updateDate();
+  setInterval(updateDate, 60000);
 
   function escapeHtml(str) {
     const div = document.createElement('div');
@@ -381,12 +382,12 @@
     return days;
   }
 
-  // ---- Daily state (resets each day): tasks, meals ----
+  // ---- Daily state (resets each day): meals ----
   const today = localDateStr(new Date());
   const DAILY_KEY = 'morning-dashboard';
   function loadState() {
     const raw = localStorage.getItem(DAILY_KEY);
-    const blank = { date: today, tasks: [], meals: [] };
+    const blank = { date: today, meals: [] };
     if (!raw) return blank;
     const parsed = JSON.parse(raw);
     if (parsed.date !== today) return blank;
@@ -401,7 +402,7 @@
   const PERSIST_KEY = 'morning-dashboard-persistent';
   function loadPersistent() {
     const raw = localStorage.getItem(PERSIST_KEY);
-    const blank = { groceries: [], backlog: [], calendarClientId: '', calendarNames: [], habitHistory: {} };
+    const blank = { groceries: [], backlog: [], calendarClientId: '', calendarNames: [], habitHistory: {}, newsApiKey: '', tasks: [] };
     if (!raw) return blank;
     return Object.assign(blank, JSON.parse(raw));
   }
@@ -523,15 +524,15 @@
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
   }
 
-  // ---- Tasks (daily) ----
+  // ---- Tasks (persistent — carries over until checked off/removed) ----
   function renderTasks() {
-    renderChecklist('task-list', state.tasks, 'No tasks yet. Add one below.',
-      (i, checked) => { state.tasks[i].done = checked; saveState(); renderTasks(); },
-      (i) => { state.tasks.splice(i, 1); saveState(); renderTasks(); });
+    renderChecklist('task-list', persistent.tasks, 'No tasks yet. Add one below.',
+      (i, checked) => { persistent.tasks[i].done = checked; savePersistent(); renderTasks(); },
+      (i) => { persistent.tasks.splice(i, 1); savePersistent(); renderTasks(); });
   }
   bindAdd('task-input', 'task-add-btn', text => {
-    state.tasks.push({ text, done: false });
-    saveState();
+    persistent.tasks.push({ text, done: false });
+    savePersistent();
     renderTasks();
   });
 
@@ -641,19 +642,30 @@
     }
   }
 
-  // ---- News (live, Reddit's public JSON API, no API key) ----
-  // Personalized to health, pop culture, and world events instead of one general feed.
+  // ---- News (live, NewsAPI.org, requires your own free API key — see Settings) ----
+  // Personalized to health, pop culture, and top/world events instead of one general feed.
   const NEWS_CATEGORIES = [
-    { sub: 'health', label: 'Health' },
-    { sub: 'entertainment', label: 'Pop Culture' },
-    { sub: 'worldnews', label: 'World' },
+    { category: 'health', label: 'Health' },
+    { category: 'entertainment', label: 'Pop Culture' },
+    { category: 'general', label: 'World' },
   ];
+
+  function toggleNewsSettings(show) {
+    document.getElementById('news-settings').style.display = show ? 'block' : 'none';
+  }
 
   async function fetchNews() {
     const list = document.getElementById('news-list');
+    if (!persistent.newsApiKey) {
+      list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Add a free NewsAPI.org key in Settings below to load Health/Pop Culture/World headlines.</div>';
+      return;
+    }
+    list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Loading...</div>';
     try {
       const results = await Promise.allSettled(NEWS_CATEGORIES.map(cat =>
-        fetch(`https://www.reddit.com/r/${cat.sub}/top.json?limit=3&t=day`).then(res => {
+        fetch(
+          `https://newsapi.org/v2/top-headlines?category=${cat.category}&language=en&pageSize=3&apiKey=${encodeURIComponent(persistent.newsApiKey)}`
+        ).then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
         })
@@ -663,10 +675,8 @@
       results.forEach((result, i) => {
         if (result.status !== 'fulfilled') return;
         const cat = NEWS_CATEGORIES[i];
-        (result.value.data.children || []).forEach(child => {
-          const post = child.data;
-          const url = post.url && !post.is_self ? post.url : `https://reddit.com${post.permalink}`;
-          items.push({ title: post.title, url, points: post.ups, comments: post.num_comments, category: cat.label });
+        (result.value.articles || []).forEach(article => {
+          items.push({ title: article.title, url: article.url, source: article.source && article.source.name, category: cat.label });
         });
       });
 
@@ -678,12 +688,12 @@
         div.className = 'news-item';
         div.innerHTML = `
           <div class="news-title"><a href="${item.url}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a></div>
-          <div class="news-meta">${item.category} · ${item.points} points · ${item.comments} comments</div>
+          <div class="news-meta">${item.category}${item.source ? ' · ' + escapeHtml(item.source) : ''}</div>
         `;
         list.appendChild(div);
       });
     } catch (err) {
-      list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Headlines unavailable — check your connection.</div>';
+      list.innerHTML = `<div style="color: var(--danger); font-size: 13px;">Headlines unavailable: ${escapeHtml(err.message)}</div>`;
     }
   }
 
@@ -885,21 +895,21 @@
     return items;
   }
 
-  // ---- Inbox (live, Gmail via the same Google sign-in, unread previews only) ----
+  // ---- Inbox (live, Gmail via the same Google sign-in, priority = important + unread) ----
   async function fetchGmailInbox() {
     const list = document.getElementById('gmail-list');
     list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Loading inbox...</div>';
     const authHeaders = { headers: { Authorization: `Bearer ${calendarAccessToken}` } };
     try {
       const listRes = await fetch(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent('is:important is:unread') + '&maxResults=5',
         authHeaders
       );
       if (!listRes.ok) throw new Error(`HTTP ${listRes.status}`);
       const messageRefs = (await listRes.json()).messages || [];
 
       if (messageRefs.length === 0) {
-        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Inbox zero — no unread email. 🎉</div>';
+        list.innerHTML = '<div style="color: var(--muted); font-size: 13px;">Priority inbox is clear — no important unread email. 🎉</div>';
         document.getElementById('gmail-status').textContent = 'Connected';
         return;
       }
@@ -936,7 +946,7 @@
         list.appendChild(div);
       });
 
-      document.getElementById('gmail-status').textContent = `Connected · ${messageRefs.length} unread`;
+      document.getElementById('gmail-status').textContent = `Connected · ${messageRefs.length} priority`;
     } catch (err) {
       list.innerHTML = `<div style="color: var(--danger); font-size: 13px;">Could not load inbox: ${escapeHtml(err.message)}</div>`;
     }
@@ -1041,6 +1051,18 @@
     if (persistent.calendarClientId) connectCalendar();
   });
   updateCalendarConnectButton();
+
+  document.getElementById('news-settings-btn').addEventListener('click', () => {
+    const panel = document.getElementById('news-settings');
+    toggleNewsSettings(panel.style.display !== 'block');
+  });
+  document.getElementById('news-api-key-input').value = persistent.newsApiKey || '';
+  document.getElementById('news-save-btn').addEventListener('click', () => {
+    persistent.newsApiKey = document.getElementById('news-api-key-input').value.trim();
+    savePersistent();
+    toggleNewsSettings(false);
+    fetchNews();
+  });
 
   // ---- Init ----
   pruneHabitHistory();
