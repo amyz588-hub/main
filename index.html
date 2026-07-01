@@ -734,10 +734,13 @@
       if (!listRes.ok) throw new Error(`Calendar list error (${listRes.status})`);
       const listData = await listRes.json();
       const nameFilters = persistent.calendarNames || [];
+      // summaryOverride is the name you personally see in your Google Calendar sidebar; it can differ
+      // from summary (the calendar's own title), especially for your primary calendar or shared calendars.
+      const displayName = cal => cal.summaryOverride || cal.summary || cal.id;
       const calendars = nameFilters.length > 0
         ? (listData.items || []).filter(cal => {
-            const summary = (cal.summary || '').toLowerCase();
-            return nameFilters.some(name => summary.includes(name));
+            const name = displayName(cal).toLowerCase();
+            return nameFilters.some(filter => name.includes(filter));
           })
         : (listData.items || []).filter(cal => cal.selected !== false);
 
@@ -751,7 +754,7 @@
           `&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
           authHeaders
         ).then(res => {
-          if (!res.ok) throw new Error(`${cal.summary || cal.id}: ${res.status}`);
+          if (!res.ok) throw new Error(`${displayName(cal)}: ${res.status}`);
           return res.json();
         })
       ));
@@ -771,7 +774,7 @@
             : new Date(ev.start.dateTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
           (eventsByDate[dateStr] = eventsByDate[dateStr] || []).push({
             time, timestamp, title: ev.summary || '(no title)', location: ev.location,
-            calendarName: calendars.length > 1 ? (cal.summary || cal.id) : null,
+            calendarName: calendars.length > 1 ? displayName(cal) : null,
             calendarColor: cal.backgroundColor || 'var(--muted)',
           });
         });
