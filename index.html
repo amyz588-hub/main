@@ -252,7 +252,7 @@
     <div id="calendar-settings" class="calendar-settings-panel" style="display:none;">
       <p>
         1. In <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>, create an OAuth 2.0 Client ID (type: Web application).<br>
-        2. Enable the <strong>Google Calendar API</strong>, <strong>Google Tasks API</strong> (covers reminders, since Google migrated Reminders into Tasks), and <strong>Gmail API</strong> (for the Inbox card) for that project.<br>
+        2. Enable the <strong>Google Calendar API</strong>, <strong>Google Tasks API</strong> (covers reminders, since Google migrated Reminders into Tasks), and <strong>Gmail API</strong> (for Inbox, Purchases, and auto-labeling wedding-planning emails — this one requests read/write access, not just read) for that project.<br>
         3. Add this page's exact URL (e.g. http://localhost:8000) to "Authorized JavaScript origins" — <code>file://</code> won't work, serve this page over http(s).<br>
         4. Paste the Client ID below. Optionally list specific calendar names to include (comma-separated) — this pulls those calendars even if they're hidden/unselected in your Google Calendar sidebar. Leave blank to include all your visible calendars.<br>
         5. Click Save, then "Sign in with Google".
@@ -275,6 +275,7 @@
     <div id="gmail-list">
       <div style="color: var(--muted); font-size: 13px;">Important, unread email previews show up here once you sign in with Google (Agenda card) — Gmail uses the same sign-in.</div>
     </div>
+    <div id="wedding-label-status" style="display:none; color: var(--muted); font-size: 12px; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px;"></div>
   </div>
 
   <!-- Purchases / Returns -->
@@ -984,9 +985,9 @@
     'newer_than:40d (subject:receipt OR subject:invoice OR subject:"order confirmation" OR ' +
     'subject:"your order" OR subject:shipped OR subject:"thank you for your order" OR subject:"order confirmed")';
 
-  async function searchGmailMessages(query, authHeaders) {
+  async function searchGmailMessages(query, authHeaders, maxResults = 10) {
     const res = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent(query) + '&maxResults=10',
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=' + encodeURIComponent(query) + `&maxResults=${maxResults}`,
       authHeaders
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1068,6 +1069,63 @@
     }
   }
 
+  // ---- Auto-label wedding planning emails (live, Gmail modify — creates/reuses a label) ----
+  const WEDDING_LABEL_NAME = 'Wedding Planning';
+  const WEDDING_QUERY =
+    '(subject:wedding OR subject:venue OR subject:caterer OR subject:florist OR subject:bridesmaid OR ' +
+    'subject:groomsmen OR subject:"save the date" OR subject:RSVP OR subject:registry OR ' +
+    'subject:"wedding planner" OR subject:ceremony OR subject:reception OR ' +
+    'from:theknot.com OR from:zola.com OR from:weddingwire.com OR from:minted.com)';
+
+  async function getOrCreateLabel(name, authHeaders) {
+    const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', authHeaders);
+    if (!listRes.ok) throw new Error(`HTTP ${listRes.status} (labels.list)`);
+    const labels = (await listRes.json()).labels || [];
+    const existing = labels.find(l => l.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing.id;
+
+    const createRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      method: 'POST',
+      headers: { ...authHeaders.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, labelListVisibility: 'labelShow', messageListVisibility: 'show' }),
+    });
+    if (!createRes.ok) throw new Error(`HTTP ${createRes.status} (labels.create)`);
+    return (await createRes.json()).id;
+  }
+
+  async function labelWeddingEmails() {
+    const statusEl = document.getElementById('wedding-label-status');
+    const authHeaders = { headers: { Authorization: `Bearer ${calendarAccessToken}` } };
+    try {
+      const labelId = await getOrCreateLabel(WEDDING_LABEL_NAME, authHeaders);
+      const messageRefs = await searchGmailMessages(WEDDING_QUERY, authHeaders, 50);
+
+      if (messageRefs.length === 0) {
+        statusEl.textContent = `🏷️ No new "${WEDDING_LABEL_NAME}" emails matched this time.`;
+        statusEl.style.display = 'block';
+        return;
+      }
+
+      const results = await Promise.allSettled(messageRefs.map(ref =>
+        fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${ref.id}/modify`, {
+          method: 'POST',
+          headers: { ...authHeaders.headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addLabelIds: [labelId] }),
+        }).then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+      ));
+
+      const labeledCount = results.filter(r => r.status === 'fulfilled').length;
+      statusEl.textContent = `🏷️ Labeled ${labeledCount} email${labeledCount === 1 ? '' : 's'} as "${WEDDING_LABEL_NAME}".`;
+      statusEl.style.display = 'block';
+    } catch (err) {
+      statusEl.textContent = `Could not label wedding-planning emails: ${err.message}`;
+      statusEl.style.display = 'block';
+    }
+  }
+
   function updateCalendarConnectButton() {
     document.getElementById('calendar-connect-btn').textContent =
       persistent.calendarClientId ? 'Sign in with Google' : 'Connect Calendar';
@@ -1086,7 +1144,7 @@
       await loadGis();
       const tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: persistent.calendarClientId,
-        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly https://www.googleapis.com/auth/gmail.readonly',
+        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly https://www.googleapis.com/auth/gmail.modify',
         callback: async (resp) => {
           if (resp.error) {
             setAgendaError('Sign-in failed: ' + resp.error);
@@ -1096,6 +1154,7 @@
           await fetchCalendarEvents();
           await fetchGmailInbox();
           await fetchPurchases();
+          await labelWeddingEmails();
         },
       });
       tokenClient.requestAccessToken();
@@ -1137,13 +1196,14 @@
       await loadGis();
       const tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: persistent.calendarClientId,
-        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly https://www.googleapis.com/auth/gmail.readonly',
+        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly https://www.googleapis.com/auth/gmail.modify',
         callback: async (resp) => {
           if (resp.error) return;
           calendarAccessToken = resp.access_token;
           await fetchCalendarEvents();
           await fetchGmailInbox();
           await fetchPurchases();
+          await labelWeddingEmails();
         },
       });
       tokenClient.requestAccessToken({ prompt: '' });
